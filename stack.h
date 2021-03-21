@@ -93,4 +93,7 @@ int stackPop(Stack *stack);
  */
 int stackPeek(const Stack *stack);
 
+/** Frees all memory owned by the stack. */
+void stackFree(const Stack *stack);
+
 #endif
