@@ -78,12 +78,13 @@ int stackPeek(const Stack *stack)
     return stack->data[stack->size - 1];
 }
 
-void stackFree(const Stack *stack)
+void stackFree(Stack *stack)
 {
     if (!stack) {
         error("stack is NULL");
-    } else {
-        free(stack->data);
-        free(stack);
+        return;
     }
+
+    free(stack->data);
+    free(stack);
 }
