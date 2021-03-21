@@ -1,3 +1,7 @@
+/** @file
+ * The main header file of the program.
+ */
+
 #ifndef INIGET_H
 #define INIGET_H
 
@@ -26,9 +30,10 @@ enum OpCode
  *                      TYPEDEFS                        *
  ********************************************************/
 
+/** @cond */
 typedef struct Query Query;
 typedef struct Data Data;
-
+/** @endcond */
 
 /********************************************************
  *                     DATA TYPES                       *
@@ -63,7 +68,7 @@ struct Query
      *
      * The stack consists of two types of numbers:
      * - indices to @ref data, which represent values
-     * - operators (negative values by convention, see @ref OpCode)
+     * - operators (negative values by convention, see enum OpCode)
      */
     int *op_stack;
 };

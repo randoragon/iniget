@@ -1,3 +1,7 @@
+/** @file
+ * Functions for communicating with the user/developer.
+ */
+
 #ifndef ERROR_H
 #define ERROR_H
 

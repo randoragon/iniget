@@ -1,3 +1,7 @@
+/** @file
+ * A simple stack implementation for postfix notation.
+ */
+
 #ifndef STACK_H
 #define STACK_H
 
@@ -8,10 +12,10 @@
  *                     CONSTANTS                        *
  ********************************************************/
 
-/** Returned by @ref stackPop if stack is empty. */
+/** Returned by @ref stackPop and @ref stackPeek if stack is empty. */
 #define STACK_EMPTY (INT_MIN)
 
-/** Returned by @ref stackPop in case of an internal error. */
+/** Returned by some functions in case of an internal error. */
 #define STACK_INTERNAL_ERROR (INT_MIN + 1)
 
 /** The initial capacity of the stack (will dynamically increase if needed). */
@@ -21,7 +25,9 @@
  *                      TYPEDEFS                        *
  ********************************************************/
 
+/** cond */
 typedef struct Stack Stack;
+/** endcond */
 
 
 /********************************************************
