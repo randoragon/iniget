@@ -1,7 +1,7 @@
 CC = cc
 CFLAGS = -std=c89 -pedantic -Wall
 LDFLAGS =
-OBJS = error.o stack.o iniget.o
+OBJS = error.o stack.o dataset.o query.o iniget.o
 OUT = iniget
 PREFIX = /usr/local
 
