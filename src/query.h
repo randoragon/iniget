@@ -98,4 +98,4 @@ int validateQueryString(const char *str);
 /** Frees all memory owned by a query. */
 void queryFree(Query *query);
 
-#endif
+#endif /* QUERY_H */

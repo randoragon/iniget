@@ -96,4 +96,4 @@ int stackPeek(const Stack *stack);
 /** Frees all memory owned by the stack. */
 void stackFree(Stack *stack);
 
-#endif
+#endif /* STACK_H */

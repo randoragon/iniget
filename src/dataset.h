@@ -97,4 +97,4 @@ int datasetAdd(DataSet *set, const char *section, const char *key);
 /** Frees all memory owned by the dataset. */
 void datasetFree(DataSet *set);
 
-#endif
+#endif /* DATASET_H */

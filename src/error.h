@@ -24,4 +24,4 @@ void info(const char *fmt, ...);
  */
 void error(const char *fmt, ...);
 
-#endif
+#endif /* ERROR_H */
