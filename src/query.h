@@ -8,7 +8,7 @@
 #include "stack.h"
 #include "dataset.h"
 #include <stdlib.h>
-#include <limits.h>
+
 
 /********************************************************
  *                     CONSTANTS                        *
@@ -21,12 +21,26 @@
  */
 enum OpCode
 {
-    OP_ADD = -1,
-    OP_SUB = -2,
-    OP_MUL = -3,
-    OP_DIV = -4,
-    OP_MOD = -5
+    OP_ADD = -1, /*  +  */
+    OP_SUB = -2, /*  -  */
+    OP_MUL = -3, /*  *  */
+    OP_DIV = -4, /*  /  */
+    OP_MOD = -5, /*  %  */
+    OP_LPR = -6, /*  (  */
+    OP_RPR = -7, /*  )  */
+    OP_POW = -8, /*  ^  */
+    OP_COUNT = 9 /* the total number of operator types */
 };
+
+/** Numerical representation of operator associativity. */
+enum OpAssoc
+{
+    OP_ASSOC_ANY,
+    OP_ASSOC_LEFT,
+    OP_ASSOC_RIGHT,
+    OP_ASSOC_NA      /* non-applicable (for parentheses) */
+};
+
 
 /********************************************************
  *                      TYPEDEFS                        *
@@ -34,7 +48,30 @@ enum OpCode
 
 /** @cond */
 typedef struct Query Query;
+typedef enum OpAssoc OpAssoc;
 /** @endcond */
+
+
+/********************************************************
+ *                     VARIABLES                        *
+ ********************************************************/
+
+/** Stores associativity rules for each operator type.
+ *
+ * The array is indexed by negating an OpCode, i.e.
+ * the associativity of addition is stored in @c opAssoc[-OP_ADD]
+ * and so on. See @ref OpCode for a full list.
+ */
+extern const OpAssoc opAssoc[OP_COUNT];
+
+/** Stores precedence of each operator type.
+ *
+ * The values are encoded as ints, greater values mean
+ * higher precedence. The array is indexed by negating an
+ * OpCode, i.e. the precedence of multiplication is stored
+ * in @c opPrec[-OP_MUL].
+ */
+extern const int opPrec[OP_COUNT];
 
 
 /********************************************************
@@ -61,6 +98,7 @@ struct Query
     Stack *op_stack;
 };
 
+
 /********************************************************
  *                     FUNCTIONS                        *
  ********************************************************/
@@ -70,8 +108,8 @@ struct Query
  * Once an output query is obtained through @p query_ptr, it must be
  * manually freed with @ref queryFree.
  *
- * @param query_ptr Address of the query.
- * @param str Input string to be parsed.
+ * @param[out] query_ptr Address of the query.
+ * @param[in] str Input string to be parsed.
  *
  * @returns
  * - 0 - success
@@ -81,19 +119,47 @@ struct Query
  */
 int parseQueryString(Query **query_ptr, const char *str);
 
-/** Validates a query string and returns the number of distinct values present within.
+/** Parses a query string into integer tokens.
  *
- * If validation fails, an appropriate message is printed for
- * the user and the return value is <0. Note that a valid query
- * does necessarily not have to contain any value. For example,
- * "2 * 4" is a completely valid query which would simply produce 8,
- * even though in the context of INI files it's pretty useless.
+ * This function passes through @p str, accumulates all
+ * distinct section/key pairs into a DataSet, and in
+ * parallel builds an array of integers, where each integer
+ * is a special token. The resulting list of tokens is still
+ * in infix notation.
+ *
+ * Each token is either a non-negative value which is an
+ * index to a DataSet pair, or a negative value denoting
+ * an operator (for all negative values see @ref OpCode).
+ *
+ * @param[out] tokens_ptr Address of the tokens array.
+ * @param[out] set_ptr Address of the dataset.
+ * @param[in] str Input string to be parsed.
  *
  * @returns
- * - @c >=0 - success
+ * - size of @p tokens_ptr - success
  * - @c <0 - failure
  */
-int validateQueryString(const char *str);
+int tokenizeQueryString(int **tokens_ptr, DataSet **set_ptr, const char *str);
+
+/** Converts an infix array into postfix stack.
+ *
+ * Input format:
+ * An array of integers. Each integer is treated as operand
+ * if >=0, and as an operator if <0. Information about operator
+ * precedence/associativity is fetched from global variables
+ * @ref opPrec and @ref opAsoc.
+ *
+ * This function does no safety checking, it expects a valid
+ * infix input.
+ *
+ * @param[out] postfix_ptr Address of the stack.
+ * @param[in] infix Array of tokens in infix order.
+ *
+ * @returns
+ * - 0 - success
+ * - 1 - internal error
+ */
+int infixPostfix(Stack **postfix_ptr, const int *infix);
 
 /** Frees all memory owned by a query. */
 void queryFree(Query *query);

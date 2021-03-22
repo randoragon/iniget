@@ -2,6 +2,31 @@
 #include "error.h"
 #include <stdlib.h>
 
+/* Define operator associativity */
+const OpAssoc opAssoc[OP_COUNT] = {
+    /* padding */ OP_ASSOC_NA,
+    /* OP_ADD  */ OP_ASSOC_ANY,
+    /* OP_SUB  */ OP_ASSOC_ANY,
+    /* OP_MUL  */ OP_ASSOC_LEFT,
+    /* OP_DIV  */ OP_ASSOC_LEFT,
+    /* OP_MOD  */ OP_ASSOC_LEFT,
+    /* OP_LPR  */ OP_ASSOC_NA,
+    /* OP_RPR  */ OP_ASSOC_NA,
+    /* OP_POW  */ OP_ASSOC_RIGHT
+};
+
+/* Define operator precedence */
+const int opPrec[OP_COUNT] = {
+    /* padding */ OP_ASSOC_NA,
+    /* OP_ADD: */ 1,
+    /* OP_SUB  */ 1,
+    /* OP_MUL  */ 2,
+    /* OP_DIV  */ 2,
+    /* OP_MOD  */ 2,
+    /* OP_LPR  */ -1, /* non-applicable */
+    /* OP_RPR  */ -1, /* non-applicable */
+    /* OP_POW  */ 3
+};
 
 int parseQueryString(Query **query_ptr, const char *str)
 {
@@ -20,36 +45,30 @@ int parseQueryString(Query **query_ptr, const char *str)
 
     /* Construct new query from string */
     {
-        /* To maximize efficiency, only a single pass-through
-         * is used to validate and extract information from
-         * the query string, at the cost of making the code
-         * somewhat more convoluted.
-         *
-         * To simplify things, here is a brief explanation
-         * of the parsing strategy and some variables:
-         * 
-         * - The string is read character-by-character.
-         * - A stack is used to store indices of open parentheses
-         *   to check for unbalanced ones.
-         */
-        Data *data;
-        size_t data_size;
-        char *p, *q;
-        Stack *p_l;
+        int *tokens_infix;
+        Stack *tokens_postfix;
+        DataSet *set;
 
-        if ((p_l = stackCreate()) == NULL) {
-            info("memory error");
-            return 1;
+        /* Pass-through 1: tokenize, validate and build DataSet */
+        if (tokenizeQueryString(&tokens_infix, &set, str) < 0) {
+            info("invalid query");
+            free(new);
+            return 3;
         }
 
-        /* Allocate data to be able to fit all distinct values */
-        data_size = 16;
-        if (!(data = malloc(data_size * sizeof *data))) {
-            info("memory error");
-            return 1;
+        /* Pass-through 2: convert infix to postfix */
+        if (infixPostfix(&tokens_postfix, tokens_infix)) {
+            error("infixPostfix failed");
+            free(tokens_infix);
+            free(new);
+            return 2;
         }
-        
-        /* TODO */
+
+        /* Store the results in new query */
+        new->data = set;
+        new->op_stack = tokens_postfix;
+
+        free(tokens_infix);
     }
 
     /* Output the new query */
@@ -58,8 +77,15 @@ int parseQueryString(Query **query_ptr, const char *str)
     return 0;
 }
 
-int validateQueryString(const char *str)
+int tokenizeQueryString(int **tokens_ptr, DataSet **set_ptr, const char *str)
 {
+    /* TODO */
+    return 0;
+}
+
+int infixPostfix(Stack **postfix_ptr, const int *infix)
+{
+    /* TODO */
     return 0;
 }
 
