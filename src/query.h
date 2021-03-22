@@ -22,24 +22,39 @@
  */
 enum OpCode
 {
-    OP_ADD = -1, /*  +  */
-    OP_SUB = -2, /*  -  */
-    OP_MUL = -3, /*  *  */
-    OP_DIV = -4, /*  /  */
-    OP_MOD = -5, /*  %  */
-    OP_LPR = -6, /*  (  */
-    OP_RPR = -7, /*  )  */
-    OP_POW = -8, /*  ^  */
-    OP_COUNT = 9 /* the total number of operator types */
+    /** Addition '+' */
+    OP_ADD = -1,
+    /** Subtraction '-' */
+    OP_SUB = -2,
+    /** Multiplication '*' */
+    OP_MUL = -3,
+    /** Division '/' */
+    OP_DIV = -4,
+    /** Modulus '%%' */
+    OP_MOD = -5,
+    /** Left parenthesis '(' */
+    OP_LPR = -6,
+    /** Right parenthesis ')' */
+    OP_RPR = -7,
+    /** Exponentiation '^' */
+    OP_POW = -8,
+    /** This is not an actual OpCode, it is used as a constant
+     *  for determining the array size required to fit all
+     *  operator types. */
+    OP_COUNT = 9
 };
 
 /** Numerical representation of operator associativity. */
 enum OpAssoc
 {
+    /** Fully associative operators (like addition, multiplication). */
     OP_ASSOC_ANY,
+    /** Left-associative operators (like division). */
     OP_ASSOC_LEFT,
+    /** Right-associative operators (like exponentiation). */
     OP_ASSOC_RIGHT,
-    OP_ASSOC_NA      /* non-applicable (for parentheses) */
+    /** Non-applicable (for parentheses). */
+    OP_ASSOC_NA
 };
 
 
@@ -150,7 +165,7 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, const char *str);
  * A stack of integers. Each integer is treated as operand
  * if >=0, and as an operator if <0. Information about operator
  * precedence/associativity is fetched from global variables
- * @ref opPrec and @ref opAsoc.
+ * @ref opPrec and @ref opAssoc.
  *
  * This function does not do any extensive safety checking, it expects
  * a valid infix input.
