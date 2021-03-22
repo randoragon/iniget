@@ -7,6 +7,7 @@
 
 #include "stack.h"
 #include "dataset.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 
@@ -124,33 +125,35 @@ int parseQueryString(Query **query_ptr, const char *str);
  * This function passes through @p str, accumulates all
  * distinct section/key pairs into a DataSet, and in
  * parallel builds an array of integers, where each integer
- * is a special token. The resulting list of tokens is still
+ * is a special token. The resulting array of tokens is still
  * in infix notation.
  *
  * Each token is either a non-negative value which is an
  * index to a DataSet pair, or a negative value denoting
  * an operator (for all negative values see @ref OpCode).
  *
- * @param[out] tokens_ptr Address of the tokens array.
+ * @param[out] tokens_ptr Address of the tokens stack.
  * @param[out] set_ptr Address of the dataset.
  * @param[in] str Input string to be parsed.
  *
  * @returns
  * - size of @p tokens_ptr - success
- * - @c <0 - failure
+ * - -1 - memory error (malloc)
+ * - -2 - invalid query
+ * - -3 - internal error
  */
-int tokenizeQueryString(int **tokens_ptr, DataSet **set_ptr, const char *str);
+int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, const char *str);
 
-/** Converts an infix array into postfix stack.
+/** Converts an infix stack into postfix stack.
  *
  * Input format:
- * An array of integers. Each integer is treated as operand
+ * A stack of integers. Each integer is treated as operand
  * if >=0, and as an operator if <0. Information about operator
  * precedence/associativity is fetched from global variables
  * @ref opPrec and @ref opAsoc.
  *
- * This function does no safety checking, it expects a valid
- * infix input.
+ * This function does not do any extensive safety checking, it expects
+ * a valid infix input.
  *
  * @param[out] postfix_ptr Address of the stack.
  * @param[in] infix Array of tokens in infix order.
@@ -159,9 +162,28 @@ int tokenizeQueryString(int **tokens_ptr, DataSet **set_ptr, const char *str);
  * - 0 - success
  * - 1 - internal error
  */
-int infixPostfix(Stack **postfix_ptr, const int *infix);
+int infixPostfix(Stack **postfix_ptr, const Stack *infix);
 
 /** Frees all memory owned by a query. */
 void queryFree(Query *query);
+
+/** Runs a list of queries on a single INI file.
+ *
+ * This function is the core of the iniget program,
+ * it does a single pass-through on an input stream
+ * and evaluates all queries you feed it. At the end,
+ * it will print the result of each query in order,
+ * one query per line. If any query fails to be evaluated,
+ * they all fail and nothing gets printed on stdout
+ * (you'll still get an appropriate stderr message).
+ *
+ * @param[inout] file The file to run the queries on.
+ * @param[in] queries An ordered list of queries to run.
+ * @param[in] qcount The number of elements in @p queries.
+ *
+ * @returns
+ * - 0 - success
+ */
+int runQueries(FILE *file, const Query **queries, size_t qcount);
 
 #endif /* QUERY_H */

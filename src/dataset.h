@@ -88,8 +88,8 @@ DataSet *datasetCreate();
 /** Adds a new value to a dataset.
  *
  * @returns
- * - 0 - success
- * - 1 - failure (realloc)
+ * - index of the element inside the dataset (>=0) - success
+ * - -1 - failure (realloc)
  * - @ref DATASET_INTERNAL_ERROR - internal error
  */
 int datasetAdd(DataSet *set, const char *section, const char *key);
