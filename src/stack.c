@@ -27,10 +27,12 @@ Stack *stackCreate()
 int stackPush(Stack *stack, int val)
 {
     if (!stack) {
+        STAMP();
         error("stack is NULL");
         return STACK_INTERNAL_ERROR;
     }
     if (val == STACK_EMPTY) {
+        STAMP();
         error("val cannot be equal to STACK_EMPTY");
         return STACK_INTERNAL_ERROR;
     }
@@ -53,6 +55,7 @@ int stackPush(Stack *stack, int val)
 int stackPop(Stack *stack)
 {
     if (!stack) {
+        STAMP();
         error("stack is NULL");
         return STACK_INTERNAL_ERROR;
     }
@@ -67,6 +70,7 @@ int stackPop(Stack *stack)
 int stackPeek(const Stack *stack)
 {
     if (!stack) {
+        STAMP();
         error("stack is NULL");
         return STACK_INTERNAL_ERROR;
     }
@@ -81,6 +85,7 @@ int stackPeek(const Stack *stack)
 void stackFree(Stack *stack)
 {
     if (!stack) {
+        STAMP();
         error("stack is NULL");
         return;
     }

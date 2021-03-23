@@ -149,7 +149,9 @@ int parseQueryString(Query **query_ptr, const char *str);
  *
  * @param[out] tokens_ptr Address of the tokens stack.
  * @param[out] set_ptr Address of the dataset.
- * @param[in] str Input string to be parsed.
+ * @param[in] str Input string to be parsed. The string may
+ * be modified during the function execution, but by the end
+ * it will be restored to its original form.
  *
  * @returns
  * - size of @p tokens_ptr - success
@@ -157,7 +159,7 @@ int parseQueryString(Query **query_ptr, const char *str);
  * - -2 - invalid query
  * - -3 - internal error
  */
-int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, const char *str);
+int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str);
 
 /** Converts an infix stack into postfix stack.
  *

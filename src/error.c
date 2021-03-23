@@ -22,7 +22,7 @@ void error(const char *fmt, ...)
 
     va_start(ap, fmt);
 
-    fprintf(stderr, "[ERROR] (%s:%d) ", __FILE__, __LINE__);
+    fputs("[ERROR] ", stderr);
     vfprintf(stderr, fmt, ap);
     putc('\n', stderr);
 

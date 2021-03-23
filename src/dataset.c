@@ -30,6 +30,7 @@ int datasetAdd(DataSet *set, const char *section, const char *key)
     size_t size1, size2;
 
     if (!set) {
+        STAMP();
         error("dataset is NULL");
         return DATASET_INTERNAL_ERROR;
     }
@@ -79,6 +80,7 @@ void datasetFree(DataSet *set)
     int i;
 
     if (!set) {
+        STAMP();
         error("dataset is NULL");
         return;
     }

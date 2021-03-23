@@ -38,6 +38,9 @@ int main(int argc, char **argv)
     runQueries(stdin, (const Query**)queries, argc - 1);
 
     /* Cleanup */
+    for (i = 1; i < argc; i++) {
+        queryFree(queries[i - 1]);
+    }
     free(queries);
 
     return EXIT_SUCCESS;
