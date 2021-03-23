@@ -249,17 +249,6 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
                     /* Finish the "ugly trick" */
                     memcpy(i, &tmp, sizeof *i);
                     is_parsed = true;
-
-                    /* Push the result */
-                    err = stackPush(tokens, idx);
-                    if (err == 1) {
-                        info("memory error");
-                        return -1;
-                    } else if (err == STACK_INTERNAL_ERROR) {
-                        STAMP();
-                        error("stackPush internal error");
-                        return -3;
-                    }
                     break;
                 case OP: case LPR: case RPR:
                     switch (*j) {
