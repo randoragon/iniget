@@ -36,7 +36,6 @@ int parseQueryString(Query **query_ptr, const char *str)
     Query *new;
     char *str_cpy;
 
-    fprintf(stderr, "PARSING \"%s\"...\n", str);
     if (!query_ptr) {
         STAMP();
         error("query_ptr is NULL");
@@ -67,7 +66,6 @@ int parseQueryString(Query **query_ptr, const char *str)
 
         /* Pass-through 1: tokenize, validate and build DataSet */
         if (tokenizeQueryString(&tokens_infix, &set, str_cpy) < 0) {
-            info("invalid query");
             free(new);
             free(str_cpy);
             return 3;
@@ -108,11 +106,17 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
                       * k - Marks the beginning of the last token that was
                       *     parsed and added to the dataset. */
     Stack *parens; /* stack for catching unmatched parentheses */
-    enum { NONE, VAL, OP, LPR, RPR } cur_tok, last_tok; /* Current and last token type.
-                                                         * Parentheses are considered a
-                                                         * separate types here for convenience. */
+    enum {
+        BEGIN, END, /* the start and end of the string */
+        VAL, OP,    /* operands and operators */
+        LPR, RPR,   /* left and right parentheses */
+        SPACE       /* any whitespace character */
+    } cur_tok, last_tok; /* Current and last token type. Note that "token"
+                          * here does not directly translate into the
+                          * "token" that will be encoded on the tokens_ptr
+                          * stack. Some extra values have been added
+                          * (BEGIN, END, SPACE) to make parsing easier. */
 
-    fprintf(stderr, "\tTOKENIZE \"%s\"...\n", str);
     /* Initialize needed structures */
     if (!(parens = stackCreate())) {
         info("memory error");
@@ -139,12 +143,10 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
 
     /* Validate, extract and tokenize str */
     i = j = str, k = NULL;
-    cur_tok = last_tok = NONE;
+    cur_tok = last_tok = BEGIN;
     while (1) {
         char c = *i; /* The current character */
-        bool cur_changed; /* true if cur_tok changed its value in the current iteration,
-                           * with the exception of the first iteration (because then
-                           * cur_tok always changes from NONE) */
+        bool cur_changed; /* true iff cur_tok changed its value in the current iteration */
         int prev; /* Caches cur_tok to help determine the value of cur_changed */
 
         /* Read the current token */
@@ -153,7 +155,7 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
         if (isalnum(c) || c == '_' || c == '.') {
             cur_tok = VAL;
         } else if (strchr("+-*/^", c)) {
-            cur_tok = OP;
+            cur_tok = (c == '\0')? END : OP;
         } else if (c == '(') {
             int err;
             cur_tok = LPR;
@@ -183,24 +185,15 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
                     return -3;
                 }
             }
-        } else if (isspace(c) || c == '\0') {
-            cur_tok = NONE;
+        } else if (isspace(c)) {
+            cur_tok = SPACE;
         } else {
             info("illegal character '%c' in query", c);
             CLEANUP();
             return -2;
         }
-        cur_changed = (cur_tok != prev && i != str);
-
-        /* In the first iteration only, update last_tok */
-        if (i == j && j == str && last_tok == NONE) {
-            last_tok = cur_tok;
-        }
-
-#define P(x) (((x) == NONE)? "NONE" : (((x) == VAL)? "VAL" : (((x) == OP)? "OP" : (((x) == LPR)? "LPR" : "RPR"))))
-        fprintf(stderr, "\t\tc='%c', last_tok=%s, cur_tok=%s\n", c, P(last_tok), P(cur_tok));
-#undef P
-
+        cur_changed = (cur_tok != prev || strchr("+-*/^()", c)); /* single-character tokens are a guaranteed token change */
+        
         /* If last_tok has been read in its entirety, parse it */
         if (cur_changed && j != k) {
             char tmp, *period;
@@ -208,6 +201,9 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
             bool is_parsed = false;
 
             switch (last_tok) {
+                case BEGIN:
+                    /* Do nothing */
+                    break;
                 case VAL:
                     /* We use an ugly trick to help with parsing:
                      * Store *i in tmp, then set *i to NULL to
@@ -220,6 +216,17 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
                         /* the value is in the INI "global scope", outside of all sections */
                         idx = datasetAdd(set, "", j);
                     } else {
+                        /* Run some more error checks */
+                        if (*(period + 1) == '\0') {
+                            info("invalid query (blank key part in operand name)");
+                            CLEANUP();
+                            return -2;
+                        }
+                        if (strchr(period + 1, '.')) {
+                            info("invalid query (more than 1 period in operand name)");
+                            CLEANUP();
+                            return -2;
+                        }
                         *period = '\0';
                         idx = datasetAdd(set, j, period + 1);
                         *period = '.';
@@ -273,16 +280,12 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
 
                     is_parsed = true;
                     break;
-                case NONE: 
-                    if (j != str) {
-                        /* last_tok should only ever be equal to NONE
-                         * at the first iteration of the loop. */
-                        STAMP();
-                        error("last_tok set to NONE");
-                        CLEANUP();
-                        return -2;
-                    }
-                    break;
+                case END: case SPACE:
+                    /* last_tok should never be equal to END or SPACE */
+                    STAMP();
+                    error("last_tok set to END");
+                    CLEANUP();
+                    return -2;
                 default:
                     STAMP();
                     error("failed to match last_tok value in switch");
@@ -292,7 +295,6 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
 
             /* If the token was correctly identified */
             if (is_parsed) {
-                fprintf(stderr, "\t\tPUSHING TOKEN %d\n", idx);
 
                 /* Push the new token */
                 err = stackPush(tokens, idx);
@@ -311,7 +313,7 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
         }
 
         /* If a new token was found */
-        if (cur_changed && cur_tok != NONE) {
+        if (cur_changed && cur_tok != SPACE) {
 
             /* Catch illegal pairs of adjacent tokens */
             if (last_tok == VAL && cur_tok == VAL) {
@@ -346,6 +348,14 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
                 info("invalid query (missing operator between closing parenthesis and operand)");
                 CLEANUP();
                 return -2;
+            } else if (last_tok == BEGIN && cur_tok == OP) {
+                info("invalid query (missing operand before operator)");
+                CLEANUP();
+                return -2;
+            } else if (last_tok == OP && cur_tok == END) {
+                info("invalid query (missing operand after operator)");
+                CLEANUP();
+                return -2;
             }
 
             /* Update last token */
@@ -359,9 +369,9 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
         }
     }
 
-    /* Check for unmatched parenteses */
+    /* Check for unbalanced parenteses */
     if (parens->size != 0) {
-        info("invalid query (unmatched parentheses)");
+        info("invalid query (unbalanced parentheses)");
         CLEANUP();
         return -2;
     }
