@@ -177,7 +177,8 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str);
  *
  * @returns
  * - 0 - success
- * - 1 - internal error
+ * - 1 - memory error (malloc)
+ * - 2 - internal error
  */
 int infixPostfix(Stack **postfix_ptr, const Stack *infix);
 

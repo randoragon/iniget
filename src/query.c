@@ -75,7 +75,7 @@ int parseQueryString(Query **query_ptr, const char *str)
         if (infixPostfix(&tokens_postfix, tokens_infix)) {
             STAMP();
             error("infixPostfix failed");
-            free(tokens_infix);
+            stackFree(tokens_infix);
             free(new);
             free(str_cpy);
             return 2;
@@ -389,16 +389,147 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
 
 int infixPostfix(Stack **postfix_ptr, const Stack *infix)
 {
-    Stack *new;
+    /* Implementation follows the Shunting-Yard algorithm,
+     * the logic was carefully copied from here:
+     * https://en.wikipedia.org/wiki/Shunting-yard_algorithm#The_algorithm_in_detail
+     */
 
+    Stack *new; /* Final output stack */
+    Stack *ops; /* Supplementary stack for operators */
+    int *i;     /* For iterating through infix stack */
+
+    if (!infix) {
+        error("infix is NULL");
+        return 2;
+    }
+
+    /* Alloc & init stacks */
     if (!(new = stackCreate())) {
-        info("memory error");
+        return 1;
+    }
+    if (!(ops = stackCreate())) {
         return 1;
     }
 
-    /* TODO */
+    /* Temporary macros to do less typing */
+#define CLEANUP() do {      \
+            stackFree(new); \
+            stackFree(ops); \
+        } while (0)
+#define SPUSH(X, Y) do {                                    \
+            if ((err = stackPush((X), (Y)))) {              \
+                CLEANUP();                                  \
+                if (err == 1) {                             \
+                    return 1;                               \
+                } else if (err == STACK_INTERNAL_ERROR) {   \
+                    return 2;                               \
+                }                                           \
+            }                                               \
+        } while (0)
 
+    i = infix->data;
+    while (i - infix->data < infix->size) {
+        int tok = *i; /* current token */
+        int err;      /* for storing some error codes */
+
+        if (tok >= 0) {
+            /* Number token */
+            SPUSH(new, tok);
+        } else {
+            int prec;      /* operator precedence value */
+            OpAssoc assoc; /* operator associativity type */
+            int top;       /* token at the top of ops stack */
+
+            switch (tok) {
+                case OP_ADD: case OP_SUB: /* fallthrough */
+                case OP_MUL: case OP_DIV: /* fallthrough */
+                case OP_MOD: case OP_POW: /* fallthrough */
+
+                    /* Cache properties of current token */
+                    prec  = opPrec[-tok];
+                    assoc = opAssoc[-tok];
+
+                    /* Store the top ops stack operator */
+                    top = stackPeek(ops);
+                    if (top == STACK_INTERNAL_ERROR) {
+                        error("stackPeek failed");
+                        CLEANUP();
+                        return 2;
+                    }
+
+                    while (top != STACK_EMPTY
+                            && (opPrec[top] > prec || (opPrec[top] == prec && assoc == OP_ASSOC_LEFT))
+                            && top != OP_LPR) {
+                        /* Pop top operator and add it to output (no error checking here, because
+                         * we know from first call to stackPeek that stack is neither NULL nor empty). */
+                        stackPop(ops);
+                        SPUSH(new, top);
+
+                        /* Fetch next element */
+                        top = stackPeek(ops);
+                    }
+
+                    SPUSH(ops, tok);
+
+                    break;
+                case OP_LPR:
+                    SPUSH(ops, tok);
+                    break;
+                case OP_RPR:
+                    
+                    /* Store the top ops stack operator */
+                    top = stackPeek(ops);
+                    if (top == STACK_INTERNAL_ERROR) {
+                        error("stackPeek failed");
+                        CLEANUP();
+                        return 2;
+                    }
+
+                    while (top != OP_LPR) {
+
+                        /* Pop top operator and add it to output (no error checking here, because
+                         * we know from first call to stackPeek that stack is neither NULL nor empty). */
+                        stackPop(ops);
+                        SPUSH(new, top);
+
+                        /* Fetch next element */
+                        top = stackPeek(ops);
+                    }
+
+                    /* Discard the left parenthesis */
+                    stackPop(ops);
+
+                    break;
+                default:
+                    error("unmatched token (%d)", tok);
+                    CLEANUP();
+                    return 2;
+            }
+        }
+        i++;
+    }
+
+    /* Pop any remaining tokens to new stack */
+    while (ops->size > 0) {
+        int err;
+        if ((err = stackPush(new, stackPop(ops)))) {
+            CLEANUP();
+            if (err == 1) {
+                return 1;
+            } else if (err == STACK_INTERNAL_ERROR) {
+                return 2;
+            }
+        }
+    }
+
+    /* Export the final stack */
     *postfix_ptr = new;
+
+    /* Cleanup */
+    stackFree(ops);
+#undef CLEANUP
+#undef SPUSH
+
     return 0;
 }
 
