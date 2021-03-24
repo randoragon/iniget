@@ -92,7 +92,7 @@ DataSet *datasetCreate();
  * - -1 - failure (realloc)
  * - @ref DATASET_INTERNAL_ERROR - internal error
  */
-int datasetAdd(DataSet *set, const char *section, const char *key);
+size_t datasetAdd(DataSet *set, const char *section, const char *key);
 
 /** Frees all memory owned by the dataset. */
 void datasetFree(DataSet *set);

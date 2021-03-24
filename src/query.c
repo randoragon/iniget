@@ -63,6 +63,7 @@ int parseQueryString(Query **query_ptr, const char *str)
     {
         Stack *tokens_infix, *tokens_postfix;
         DataSet *set;
+        size_t i;
 
         /* Pass-through 1: tokenize, validate and build DataSet */
         if (tokenizeQueryString(&tokens_infix, &set, str_cpy) < 0) {
@@ -111,11 +112,14 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
         VAL, OP,    /* operands and operators */
         LPR, RPR,   /* left and right parentheses */
         SPACE       /* any whitespace character */
-    } cur_tok, last_tok; /* Current and last token type. Note that "token"
-                          * here does not directly translate into the
-                          * "token" that will be encoded on the tokens_ptr
-                          * stack. Some extra values have been added
-                          * (BEGIN, END, SPACE) to make parsing easier. */
+    } cur_tok, last_tok, prev; /* Current and last token type. Note that "token"
+                                * here does not directly translate into the
+                                * "token" that will be encoded on the tokens_ptr
+                                * stack. Some extra values have been added
+                                * (BEGIN, END, SPACE) to make parsing easier.
+                                * prev is a mostly unimportant variable used only
+                                * to cache cur_tok before reading characters to
+                                * see if cur_tok has changed. */
 
     /* Initialize needed structures */
     if (!(parens = stackCreate())) {
@@ -147,7 +151,6 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
     while (1) {
         char c = *i; /* The current character */
         bool cur_changed; /* true iff cur_tok changed its value in the current iteration */
-        int prev; /* Caches cur_tok to help determine the value of cur_changed */
 
         /* Read the current token */
         cur_changed = false;
@@ -417,7 +420,7 @@ int infixPostfix(Stack **postfix_ptr, const Stack *infix)
         } while (0)
 
     i = infix->data;
-    while (i - infix->data < infix->size) {
+    while ((unsigned int)(i - infix->data) < infix->size) {
         int tok = *i; /* current token */
         int err;      /* for storing some error codes */
 

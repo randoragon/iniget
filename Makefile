@@ -1,7 +1,7 @@
 # Compiler and linker options
 CC = cc
 LD = cc
-CFLAGS = -std=c89 -pedantic -Wall
+CFLAGS = -std=c89 -pedantic -Wall -Wextra
 LDFLAGS =
 
 

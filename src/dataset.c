@@ -24,9 +24,9 @@ DataSet *datasetCreate()
     return new;
 }
 
-int datasetAdd(DataSet *set, const char *section, const char *key)
+size_t datasetAdd(DataSet *set, const char *section, const char *key)
 {
-    int i;
+    size_t i;
     size_t size1, size2;
 
     if (!set) {
@@ -77,7 +77,7 @@ int datasetAdd(DataSet *set, const char *section, const char *key)
 
 void datasetFree(DataSet *set)
 {
-    int i;
+    size_t i;
 
     if (!set) {
         STAMP();
