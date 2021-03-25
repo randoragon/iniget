@@ -78,7 +78,7 @@ struct ArgVal
 
     /** The value */
     union {
-        int i;
+        long i;
         double f;
         char *s;
     } value;
@@ -101,5 +101,28 @@ ArgList *arglistCreate(size_t size);
 
 /** Frees all memory owned by the arglist. */
 void arglistFree(ArgList *arglist);
+
+/** Clear all existing values off an arglist and readies it for repopulation.
+ *
+ * This function should always be called before a @ref Query
+ * is run, to make sure that no memory leaks from an arglist.
+ * It is also automatically called in @ref arglistFree.
+ *
+ * @param[inout] arglist The arglist to clear.
+ */
+void arglistClear(ArgList *arglist);
+
+/** Converts a string representation of a value into ArgVal object.
+ *
+ * This function receives a raw string representation of a value,
+ * as it appeared in an INI file, determines its type (while
+ * performing validation) and returns an adequate ArgVal object.
+ *
+ * @param[in] str The string to interpret.
+ * 
+ * If an error occurs, @ref ArgVal::type will be set to @ref
+ * ARGVAL_TYPE_NONE.
+ */
+ArgVal argValGetFromString(const char *str);
 
 #endif /* ARGLIST_H */

@@ -300,12 +300,13 @@ IniToken iniExtractFromLine(const char *line);
  * been populated with all necessary values.
  *
  * @param[in] queries The list of queries to compute.
+ * @param[in] qcount The number of elements in @p queries.
  *
  * @returns
  * - 0 - success
  * - 2 - internal error
  * - 3 - illegal operation (e.g. multiplying strings)
  */
-int printQueries(const Query *queries);
+int printQueries(const Query **queries, size_t qcount);
 
 #endif /* QUERY_H */

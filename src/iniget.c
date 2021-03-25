@@ -9,7 +9,7 @@
 int main(int argc, char **argv)
 {
     Query **queries;
-    int i;
+    int i, ret;
 
     if (argc == 1) {
         info("at least 1 query required");
@@ -26,7 +26,7 @@ int main(int argc, char **argv)
     for (i = 1; i < argc; i++) {
         Query *q;
 
-        if(parseQueryString(&q, argv[i])) {
+        if (parseQueryString(&q, argv[i])) {
             free(queries);
             return EXIT_FAILURE;
         }
@@ -35,7 +35,7 @@ int main(int argc, char **argv)
     }
 
     /* Run queries */
-    runQueries(stdin, (const Query**)queries, argc - 1);
+    ret = runQueries(stdin, (const Query**)queries, argc - 1);
 
     /* Cleanup */
     for (i = 1; i < argc; i++) {
@@ -43,5 +43,5 @@ int main(int argc, char **argv)
     }
     free(queries);
 
-    return EXIT_SUCCESS;
+    return ret;
 }

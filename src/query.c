@@ -582,16 +582,14 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
     ssize = 256; /* Arbitrary non-zero initial size */
     if (!(section = malloc(ssize * sizeof *section))) {
         info("memory error");
+        free(line);
         return 1;
     }
     section[0] = '\0'; /* Initialize section to none ("global scope") */
 
     /* Reset all query args to BLANK */
     for (i = 0; i < qcount; i++) {
-        size_t j;
-        for (j = 0; j < queries[i]->args->size; j++) {
-            queries[i]->args->data[j].type = ARGVAL_TYPE_NONE;
-        }
+        arglistClear(queries[i]->args);
     }
 
     /* Temporary convenience macro */
@@ -600,7 +598,6 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
                     free(section); \
                 } while (0)
 
-    line = NULL;
     eof = false;
     do {
         IniToken tok;
@@ -648,6 +645,7 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
                     }
                 }
                 strcpy(section, tok.token.section);
+                free(tok.token.section);
                 break;
             case INI_LINE_VALUE:
                 /* Populate matched query parameters with value */
@@ -655,8 +653,8 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
                     size_t j;
                     for (j = 0; j < queries[i]->data->size; j++) {
                         /* Cache deeply nested variables */
-                        char *sec = queries[i]->data[j].data->section;
-                        char *key = queries[i]->data[j].data->key;
+                        char *sec = queries[i]->data->data[j].section;
+                        char *key = queries[i]->data->data[j].key;
 
                         /* Copy in-file value into all matched indices in arglists */
                         if (strcmp(section, sec) == 0
@@ -665,6 +663,10 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
                             queries[i]->args->data[j] = tok.token.value.value;
                         }
                     }
+                }
+                free(tok.token.value.key);
+                if (tok.token.value.value.type == ARGVAL_TYPE_STRING) {
+                    free(tok.token.value.value.value.s);
                 }
                 break;
             case INI_LINE_BLANK:
@@ -685,7 +687,7 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
 
     /* All queries' arglists are populated, so
      * run computations and print the results. */
-    return printQueries((const Query*)queries);
+    return printQueries(queries, qcount);
 }
 
 int getLine(FILE *file, char **buf_ptr, size_t *bufsize)
@@ -693,7 +695,7 @@ int getLine(FILE *file, char **buf_ptr, size_t *bufsize)
     size_t pos; /* Current position in the buffer */
     int c;      /* Last read character from file */
 
-    if (!file || !buf_ptr || !bufsize) {
+    if (!file || !buf_ptr || !*buf_ptr || !bufsize) {
         STAMP();
         error("one of getLine parameters is NULL");
         return 2;
@@ -726,13 +728,140 @@ int getLine(FILE *file, char **buf_ptr, size_t *bufsize)
 IniToken iniExtractFromLine(const char *line)
 {
     IniToken ret;
-    /* TODO */
+    const char *i, *j; /* i iterates forward, j marks the beginning of a token */
+
+    i = j = line;
+
+    /* Skip whitespace */
+    while (isspace(*i))
+        i++;
+
+    if (*i == '[') {
+        ret.type = INI_LINE_SECTION;
+        
+        /* Scan for the end of section */
+        j = ++i;
+        while (*i && *i != ']') {
+            if (!isalnum(*i) && *i != '_') {
+                info("error found in file (illegal character '%c' in section name)", *i);
+                ret.type = INI_LINE_ERROR;
+                return ret;
+            }
+            i++;
+        }
+        if (*i != ']') {
+            info("error found in file (no closing bracket after section name)");
+            ret.type = INI_LINE_ERROR;
+            return ret;
+        }
+        
+        /* Store the section name in a new buffer */
+        if (!(ret.token.section = malloc((i - j + 1) * sizeof *ret.token.section))) {
+            info("memory error");
+            ret.type = INI_LINE_ERROR;
+            return ret;
+        }
+        strncpy(ret.token.section, j, i - j + 1);
+        ret.token.section[i - j] = '\0';
+    } else if (isalnum(*i) || *i == '_') {
+        char *val; /* Storage for the value part */
+
+        ret.type = INI_LINE_VALUE;
+
+        /* Find end of the key part */
+        j = i;
+        while (*i && !isspace(*i) && *i != '=')
+            i++;
+        if (!*i) {
+            info("error found in file (no value after key name)");
+            ret.type = INI_LINE_ERROR;
+            return ret;
+        }
+
+        /* Store the key part in a new buffer */
+        if (!(ret.token.value.key = malloc((i - j + 1) * sizeof *ret.token.value.key))) {
+            info("memory error");
+            ret.type = INI_LINE_ERROR;
+            return ret;
+        }
+        strncpy(ret.token.value.key, j, i - j + 1);
+        ret.token.value.key[i - j] = '\0';
+
+        /* Search for '=' delimiter */
+        while (*i && *i != '=')
+            i++;
+        if (*i != '=') {
+            info("error found in file (no value after key name)");
+            ret.type = INI_LINE_ERROR;
+            return ret;
+        }
+
+        /* Skip whitespace */
+        ++i;
+        while (*i && isspace(*i))
+            i++;
+        if (!*i) {
+            info("error found in file (no value after key name)");
+            ret.type = INI_LINE_ERROR;
+            return ret;
+        }
+
+        /* Find end of the value part */
+        j = i;
+        while (*i++)
+            ;
+        
+        /* Store the value part in a new buffer */
+        if (!(val = malloc((i - j + 1) * sizeof *val))) {
+            info("memory error");
+            ret.type = INI_LINE_ERROR;
+            return ret;
+        }
+        strncpy(val, j, i - j + 1);
+        val[i - j] = '\0';
+
+        /* Determine type of the value */
+        ret.token.value.value = argValGetFromString(val);
+        if (ret.token.value.value.type == ARGVAL_TYPE_NONE) {
+            ret.type = INI_LINE_ERROR;
+        }
+        free(val);
+    } else if (*i == ';' || !*i) {
+        ret.type = INI_LINE_BLANK;
+    } else {
+        error("error extracting ArgVal from \"%s\"\n", line);
+        ret.type = INI_LINE_INTERROR;
+    }
 
     return ret;
 }
 
-int printQueries(const Query *queries)
+int printQueries(const Query **queries, size_t qcount)
 {
-    /* TODO */
+    size_t i;
+
+    for (i = 0; i < qcount; i++) {
+        size_t j;
+
+        printf("-> query #%lu\n", i);
+        for (j = 0; j < queries[i]->data->size; j++) {
+            printf("\tsection: \"%s\"\n\tkey: \"%s\"\n", queries[i]->data->data[j].section, queries[i]->data->data[j].key);
+            switch (queries[i]->args->data[j].type) {
+                case ARGVAL_TYPE_INT:
+                    printf("\ttype: INT\n\tvalue: %ld\n", queries[i]->args->data[j].value.i);
+                    break;
+                case ARGVAL_TYPE_FLOAT:
+                    printf("\ttype: FLOAT\n\tvalue: %f\n", queries[i]->args->data[j].value.f);
+                    break;
+                case ARGVAL_TYPE_STRING:
+                    printf("\ttype: STRING\n\tvalue: \"%s\"\n", queries[i]->args->data[j].value.s);
+                    break;
+                default:
+                    printf("\ttype: ERROR\n\tvalue: ERROR\n");
+                    break;
+            }
+            putchar('\n');
+        }
+    }
     return 0;
 }
