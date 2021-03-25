@@ -7,6 +7,7 @@
 
 #include "stack.h"
 #include "dataset.h"
+#include "arglist.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -57,6 +58,25 @@ enum OpAssoc
     OP_ASSOC_NA
 };
 
+/** Every line in an INI file should fall under one of these categories. */
+enum IniLineType
+{
+    /** A section name in format "[alphanum_name]" */
+    INI_LINE_SECTION,
+
+    /** A key/value pair in format "key = value" */
+    INI_LINE_VALUE,
+
+    /** A blank line or a comment starting with ';' */
+    INI_LINE_BLANK,
+
+    /** An erroneous line */
+    INI_LINE_ERROR,
+
+    /** Internal error while parsing the line */
+    INI_LINE_INTERROR
+};
+
 
 /********************************************************
  *                      TYPEDEFS                        *
@@ -65,6 +85,8 @@ enum OpAssoc
 /** @cond */
 typedef struct Query Query;
 typedef enum OpAssoc OpAssoc;
+typedef enum IniLineType IniLineType;
+typedef struct IniToken IniToken;
 /** @endcond */
 
 
@@ -105,6 +127,11 @@ struct Query
     /** An ordered set of all section/value pairs relevant to the query. */
     DataSet *data;
 
+    /** A reserved space for populating with values referenced by @ref data,
+     * with the same indexing (see @ref ArgList for more details).
+     */
+    ArgList *args;
+
     /** Operation stack in postfix format to remove all ambiguity.
      *
      * The stack consists of two types of numbers:
@@ -114,6 +141,27 @@ struct Query
     Stack *op_stack;
 };
 
+/** Holds complete information about a single (valid) line of an INI file. */
+struct IniToken
+{
+    /** The type of the stored information. */
+    IniLineType type;
+
+    /** The stored information. */
+    union {
+        /** INI [section] name. */
+        char *section;
+
+        /** INI key/value pair. */
+        struct {
+            /** The key component of the pair. */
+            char *key;
+
+            /** The value component of the pair. */
+            ArgVal value;
+        } value;
+    } token;
+};
 
 /********************************************************
  *                     FUNCTIONS                        *
@@ -201,7 +249,63 @@ void queryFree(Query *query);
  *
  * @returns
  * - 0 - success
+ * - 1 - memory error (malloc/realloc)
+ * - 2 - internal error
+ * - 3 - illegal operation (e.g. multiplying strings)
  */
 int runQueries(FILE *file, const Query **queries, size_t qcount);
+
+/** Utility function for fetching a new line into a buffer.
+ *
+ * The problem with built-in functions like @c fgets is that
+ * they don't support dynamically-sized buffers and
+ * concatenating several different buffers is a tedious
+ * process. This function avoids the problem by increasing
+ * the size of the buffer if necessary. This strategy has
+ * the advantage of keeping the number of allocations to
+ * a minimum, while having no restriction on the length of
+ * the input line with all safety checks in place.
+ *
+ * @param[inout] file The input stream to read from.
+ * @param[out] buf_ptr Pointer to buffer to populate with the new line.
+ * The location of the buffer may be overwritten by realloc.
+ * @param[inout] bufsize The size of the @p buf buffer. If
+ * during function execution the original @p bufsize proves
+ * insufficient to contain the entire line, @p buf is
+ * reallocated to a bigger size and this variable is updated
+ * accordingly.
+ *
+ * @returns
+ * - 0      - success, newline reached
+ * - @c EOF - success, end of file reached
+ * - 1      - memory error (realloc)
+ * - 2      - internal error
+ */
+int getLine(FILE *file, char **buf_ptr, size_t *bufsize);
+
+/** Validates an INI file line and extracts information from it.
+ *
+ * @param line The line to interpret.
+ *
+ * @returns
+ * An @ref IniToken object. If a syntax error is found in
+ * the ini file, the object's type will be @ref INI_LINE_ERROR.
+ * In case of internal errors, it will be @ref INI_LINE_INTERROR.
+ */
+IniToken iniExtractFromLine(const char *line);
+
+/** Computes a list of queries and prints the results in order.
+ *
+ * This function assumes each query's @ref Query::args has already
+ * been populated with all necessary values.
+ *
+ * @param[in] queries The list of queries to compute.
+ *
+ * @returns
+ * - 0 - success
+ * - 2 - internal error
+ * - 3 - illegal operation (e.g. multiplying strings)
+ */
+int printQueries(const Query *queries);
 
 #endif /* QUERY_H */

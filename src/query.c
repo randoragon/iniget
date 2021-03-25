@@ -1,4 +1,5 @@
 #include "query.h"
+#include "arglist.h"
 #include "error.h"
 #include <stdlib.h>
 #include <string.h>
@@ -72,6 +73,12 @@ int parseQueryString(Query **query_ptr, const char *str)
             return 3;
         }
 
+        printf("INFIX:   ");
+        for (i = 0; i < tokens_infix->size; i++) {
+            printf("%d, ", tokens_infix->data[i]);
+        }
+        putchar('\n');
+
         /* Pass-through 2: convert infix to postfix */
         if (infixPostfix(&tokens_postfix, tokens_infix)) {
             STAMP();
@@ -82,11 +89,25 @@ int parseQueryString(Query **query_ptr, const char *str)
             return 2;
         }
 
+        printf("POSTFIX: ");
+        for (i = 0; i < tokens_postfix->size; i++) {
+            printf("%d, ", tokens_postfix->data[i]);
+        }
+        putchar('\n');
+
         /* Store the results in new query */
         new->data = set;
         new->op_stack = tokens_postfix;
 
         stackFree(tokens_infix);
+    }
+
+    /* Create an adequately-sized arglist */
+    if (!(new->args = arglistCreate(new->data->size))) {
+        info("memory error");
+        free(new);
+        free(str_cpy);
+        return 1;
     }
 
     /* Output the new query */
@@ -391,6 +412,7 @@ int infixPostfix(Stack **postfix_ptr, const Stack *infix)
     int *i;     /* For iterating through infix stack */
 
     if (!infix) {
+        STAMP();
         error("infix is NULL");
         return 2;
     }
@@ -444,6 +466,7 @@ int infixPostfix(Stack **postfix_ptr, const Stack *infix)
                     /* Store the top ops stack operator */
                     top = stackPeek(ops);
                     if (top == STACK_INTERNAL_ERROR) {
+                        STAMP();
                         error("stackPeek failed");
                         CLEANUP();
                         return 2;
@@ -472,6 +495,7 @@ int infixPostfix(Stack **postfix_ptr, const Stack *infix)
                     /* Store the top ops stack operator */
                     top = stackPeek(ops);
                     if (top == STACK_INTERNAL_ERROR) {
+                        STAMP();
                         error("stackPeek failed");
                         CLEANUP();
                         return 2;
@@ -493,6 +517,7 @@ int infixPostfix(Stack **postfix_ptr, const Stack *infix)
 
                     break;
                 default:
+                    STAMP();
                     error("unmatched token (%d)", tok);
                     CLEANUP();
                     return 2;
@@ -534,11 +559,179 @@ void queryFree(Query *query)
     }
 
     datasetFree(query->data);
+    arglistFree(query->args);
     stackFree(query->op_stack);
     free(query);
 }
 
 int runQueries(FILE *file, const Query **queries, size_t qcount)
+{
+    char   *line; /* Stores an entire line from file */
+    size_t lsize; /* Remembers the line size */
+    bool eof; /* True if EOF was read */
+    char *section; /* Remembers the current section */
+    size_t ssize; /* Remembers the section size */
+    size_t i;
+
+    /* Allocate initial line and section buffers */
+    lsize = 256; /* Arbitrary non-zero initial size */
+    if (!(line = malloc(lsize * sizeof *line))) {
+        info("memory error");
+        return 1;
+    }
+    ssize = 256; /* Arbitrary non-zero initial size */
+    if (!(section = malloc(ssize * sizeof *section))) {
+        info("memory error");
+        return 1;
+    }
+    section[0] = '\0'; /* Initialize section to none ("global scope") */
+
+    /* Reset all query args to BLANK */
+    for (i = 0; i < qcount; i++) {
+        size_t j;
+        for (j = 0; j < queries[i]->args->size; j++) {
+            queries[i]->args->data[j].type = ARGVAL_TYPE_NONE;
+        }
+    }
+
+    /* Temporary convenience macro */
+#define CLEANUP() do { \
+                    free(line); \
+                    free(section); \
+                } while (0)
+
+    line = NULL;
+    eof = false;
+    do {
+        IniToken tok;
+
+        /* Fetch next line */
+        switch (getLine(file, &line, &lsize)) {
+            case 0:
+                break;
+            case 1:
+                return 1;
+            case 2:
+                STAMP();
+                error("getLine internal error");
+                CLEANUP();
+                return 2;
+            case EOF:
+                eof = true;
+                break;
+            default:
+                STAMP();
+                error("unmatched return code of getLine");
+                CLEANUP();
+                return 2;
+        }
+
+        /* Parse INI line */
+        tok = iniExtractFromLine(line);
+        switch (tok.type) {
+            case INI_LINE_ERROR:
+                free(line);
+                return 1;
+            case INI_LINE_INTERROR:
+                STAMP();
+                error("iniExtractFromLine internal error");
+                CLEANUP();
+                return 2;
+            case INI_LINE_SECTION:
+                /* Update section string */
+                if (ssize < strlen(tok.token.section) + 1) {
+                    ssize *= 2;
+                    if (!(section = realloc(section, ssize * sizeof *section))) {
+                        info("memory error");
+                        CLEANUP();
+                        return 1;
+                    }
+                }
+                strcpy(section, tok.token.section);
+                break;
+            case INI_LINE_VALUE:
+                /* Populate matched query parameters with value */
+                for (i = 0; i < qcount; i++) {
+                    size_t j;
+                    for (j = 0; j < queries[i]->data->size; j++) {
+                        /* Cache deeply nested variables */
+                        char *sec = queries[i]->data[j].data->section;
+                        char *key = queries[i]->data[j].data->key;
+
+                        /* Copy in-file value into all matched indices in arglists */
+                        if (strcmp(section, sec) == 0
+                                && strcmp(tok.token.value.key, key) == 0
+                                && queries[i]->args->data[j].type == ARGVAL_TYPE_NONE) {
+                            queries[i]->args->data[j] = tok.token.value.value;
+                        }
+                    }
+                }
+                break;
+            case INI_LINE_BLANK:
+                /* Gracefully skip */
+                break;
+            default:
+                STAMP();
+                error("unmatched IniLineType %d", tok.type);
+                CLEANUP();
+        }
+
+    } while (!eof);
+
+    /* Cleanup */
+    free(line);
+    free(section);
+#undef CLEANUP
+
+    /* All queries' arglists are populated, so
+     * run computations and print the results. */
+    return printQueries((const Query*)queries);
+}
+
+int getLine(FILE *file, char **buf_ptr, size_t *bufsize)
+{
+    size_t pos; /* Current position in the buffer */
+    int c;      /* Last read character from file */
+
+    if (!file || !buf_ptr || !bufsize) {
+        STAMP();
+        error("one of getLine parameters is NULL");
+        return 2;
+    }
+
+    /* Read character-by-character until newline */
+    pos = 0;
+    c = fgetc(file);
+    while (c != EOF && c != '\n') {
+
+        /* Enlarge buffer if needed */
+        if (pos == *bufsize - 1) {
+            *bufsize *= 2;
+            if (!(*buf_ptr = realloc(*buf_ptr, *bufsize * sizeof **buf_ptr))) {
+                info("memory error");
+                return 1;
+            }
+        }
+
+        (*buf_ptr)[pos++] = c;
+        c = fgetc(file);
+    }
+
+    /* Terminate the string */
+    (*buf_ptr)[pos] = '\0';
+
+    return (c == EOF)? EOF : 0;
+}
+
+IniToken iniExtractFromLine(const char *line)
+{
+    IniToken ret;
+    /* TODO */
+
+    return ret;
+}
+
+int printQueries(const Query *queries)
 {
     /* TODO */
     return 0;
