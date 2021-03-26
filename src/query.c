@@ -66,7 +66,6 @@ int parseQueryString(Query **query_ptr, const char *str)
     {
         Stack *tokens_infix, *tokens_postfix;
         DataSet *set;
-        size_t i;
 
         /* Pass-through 1: tokenize, validate and build DataSet */
         if (tokenizeQueryString(&tokens_infix, &set, str_cpy) < 0) {
@@ -74,12 +73,6 @@ int parseQueryString(Query **query_ptr, const char *str)
             free(str_cpy);
             return 3;
         }
-
-        printf("INFIX:   ");
-        for (i = 0; i < tokens_infix->size; i++) {
-            printf("%d, ", tokens_infix->data[i]);
-        }
-        putchar('\n');
 
         /* Pass-through 2: convert infix to postfix */
         if (infixPostfix(&tokens_postfix, tokens_infix)) {
@@ -90,12 +83,6 @@ int parseQueryString(Query **query_ptr, const char *str)
             free(str_cpy);
             return 2;
         }
-
-        printf("POSTFIX: ");
-        for (i = 0; i < tokens_postfix->size; i++) {
-            printf("%d, ", tokens_postfix->data[i]);
-        }
-        putchar('\n');
 
         /* Store the results in new query */
         new->data = set;
@@ -177,8 +164,6 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
     cur_tok = BEGIN;
     i = str;
     while (*i) {
-
-        printf("i=%ld '%c'\n", i - str, *i);
 
         /* Skip to the beginning of next token */
         while (isspace(*i))
@@ -900,31 +885,6 @@ int printQueries(const Query **queries, size_t qcount)
 {
     ValStack *vstack; /* evaluation stack */
     size_t i, j;
-
-    /* Debug print */
-    {
-        size_t i;
-        for (i = 0; i < qcount; i++) {
-            size_t j;
-
-            printf("-> query #%lu\n", i);
-            for (j = 0; j < queries[i]->data->size; j++) {
-                printf("\tsection: \"%s\"\n\tkey: \"%s\"\n", queries[i]->data->data[j].section, queries[i]->data->data[j].key);
-                switch (queries[i]->args->data[j].type) {
-                    case ARGVAL_TYPE_FLOAT:
-                        printf("\ttype: FLOAT\n\tvalue: %f\n", queries[i]->args->data[j].value.f);
-                        break;
-                    case ARGVAL_TYPE_STRING:
-                        printf("\ttype: STRING\n\tvalue: \"%s\"\n", queries[i]->args->data[j].value.s);
-                        break;
-                    default:
-                        printf("\ttype: ERROR\n\tvalue: ERROR\n");
-                        break;
-                }
-                putchar('\n');
-            }
-        }
-    }
 
     if (!(vstack = valstackCreate())) {
         info("memory error");
