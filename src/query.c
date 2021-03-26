@@ -1031,6 +1031,16 @@ int printQueries(const Query **queries, size_t qcount)
                             num = (size_t)num_f;
 
                             s3 = s1 * num;
+                            if (s3 == 0) {
+                                /* Special case: 0-length string */
+                                if (!(i3.value.s = malloc(sizeof *i3.value.s))) {
+                                    info("memory error");
+                                    valstackFree(vstack);
+                                    return 1;
+                                }
+                                i3.value.s[0] = '\0';
+                                break;
+                            }
 
                             if (!(i3.value.s = malloc((s3 + 1) * sizeof *i3.value.s))) {
                                 info("memory error");
