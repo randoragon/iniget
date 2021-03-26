@@ -888,6 +888,7 @@ IniToken iniExtractFromLine(const char *line)
     } else if (*i == ';' || !*i) {
         ret.type = INI_LINE_BLANK;
     } else {
+        STAMP();
         error("error extracting ArgVal from \"%s\"\n", line);
         ret.type = INI_LINE_INTERROR;
     }
