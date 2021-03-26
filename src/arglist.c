@@ -126,7 +126,6 @@ ArgVal argValGetFromString(const char *str)
                 /* Store the string */
                 strncpy(ret.value.s, beg, end - beg + 2);
                 ret.value.s[end - beg + 1] = '\0';
-                ret.is_temporary = false;
                 break;
             case ARGVAL_TYPE_FLOAT:
                 ret.value.f = atof(beg);
@@ -137,6 +136,11 @@ ArgVal argValGetFromString(const char *str)
                 break;
         }
     }
+    
+    /* All strings processed by this function
+     * come directly from an INI file, so therefore
+     * they are not "temporary". */
+    ret.is_temporary = false;
 
     return ret;
 }
