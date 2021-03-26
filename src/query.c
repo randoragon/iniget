@@ -123,272 +123,293 @@ int parseQueryString(Query **query_ptr, const char *str)
 
 int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
 {
-    DataSet *set;
-    Stack *tokens;
-    char *i, *j, *k; /* i - Reads char-by-char.
-                      * j - Marks the beginning of a currently read token.
-                      * k - Marks the beginning of the last token that was
-                      *     parsed and added to the dataset. */
-    Stack *parens; /* stack for catching unmatched parentheses */
+    Stack *tokens; /* Stack for the tokenized output */
+    Stack *parens; /* Stack for catching unbalanced parentheses */
+    DataSet *set;  /* DataSet of output section/key pairs */
+    char *i, *j;   /* Iterators: i scouts ahead, j remembers beginning of token */
     enum {
-        BEGIN, END, /* the start and end of the string */
-        VAL, OP,    /* operands and operators */
-        LPR, RPR,   /* left and right parentheses */
-        SPACE       /* any whitespace character */
-    } cur_tok, last_tok, prev; /* Current and last token type. Note that "token"
-                                * here does not directly translate into the
-                                * "token" that will be encoded on the tokens_ptr
-                                * stack. Some extra values have been added
-                                * (BEGIN, END, SPACE) to make parsing easier.
-                                * prev is a mostly unimportant variable used only
-                                * to cache cur_tok before reading characters to
-                                * see if cur_tok has changed. */
+        BEGIN,  /* beginning of str */
+        VALUE,  /* a brace-enclosed {operand} */
+        OP,     /* an operator */
+        LPR,    /* left parenthesis */
+        RPR    /* right parenthesis */
+    } cur_tok, last_tok; /* the type of the current and last read token */
 
-    /* Initialize needed structures */
+    /* Allocate necessary space */
+    if (!(tokens = stackCreate())) {
+        info("memory error");
+        return -1;
+    }
     if (!(parens = stackCreate())) {
         info("memory error");
+        stackFree(tokens);
         return -1;
     }
     if (!(set = datasetCreate())) {
         info("memory error");
-        stackFree(parens);
-        return -1;
-    }
-    if (!(tokens = stackCreate())) {
-        info("memory error");
-        datasetFree(set);
+        stackFree(tokens);
         stackFree(parens);
         return -1;
     }
 
-    /* Helper macro to make code less redundant */
-#define CLEANUP() do { \
-                    stackFree(parens); \
-                    stackFree(tokens); \
-                    datasetFree(set); \
-                } while (0)
+    /* Temporary convenience macros to keep code cleaner */
+#define CLEANUP() do {              \
+                stackFree(tokens);  \
+                stackFree(parens);  \
+                datasetFree(set);   \
+            } while (0)
+#define SPUSH(S, X) do { \
+                switch (stackPush((S), (X))) {              \
+                    case 0: break;                          \
+                    case 1: CLEANUP(); return -1;           \
+                    case STACK_INTERNAL_ERROR:              \
+                        STAMP();                            \
+                        error("stackPush internal error");  \
+                        return -3;                          \
+                    default:                                \
+                        STAMP();                            \
+                        error("unmatched return code");     \
+                        return -3;                          \
+                }                                           \
+            } while (0)
 
-    /* Validate, extract and tokenize str */
-    i = j = str, k = NULL;
-    cur_tok = last_tok = BEGIN;
-    while (1) {
-        char c = *i; /* The current character */
-        bool cur_changed; /* true iff cur_tok changed its value in the current iteration */
+    /* Parse all tokens */
+    cur_tok = BEGIN;
+    i = str;
+    while (*i) {
 
-        /* Read the current token */
-        cur_changed = false;
-        prev = cur_tok;
-        if (isalnum(c) || c == '_' || c == '.') {
-            cur_tok = VAL;
-        } else if (strchr("+-*/^", c)) {
-            cur_tok = (c == '\0')? END : OP;
-        } else if (c == '(') {
-            int err;
-            cur_tok = LPR;
-            err = stackPush(parens, '(');
-            if (err == 1) {
+        printf("i=%ld '%c'\n", i - str, *i);
+
+        /* Skip to the beginning of next token */
+        while (isspace(*i))
+            i++;
+
+        /* Determine and parse cur_token */
+        last_tok = cur_tok;
+        if (*i == '{') {
+            char *period;      /* for finding the period separator later */
+            char *sec, *key;   /* buffers for section and key names */
+            size_t ssec, skey; /* size of sec and key buffers */
+            int idx;           /* dataset index of a new value */
+
+            cur_tok = VALUE;
+
+            /* Catch syntax errors */
+            switch (last_tok) {
+                case BEGIN: case LPR: case OP:
+                    /* Gracefully break */
+                    break;
+                case VALUE: case RPR:
+                    /* Implicit multiplication */
+                    SPUSH(tokens, OP_MUL);
+                    break;
+                default:
+                    STAMP();
+                    error("invalid last_tok %d", last_tok);
+                    CLEANUP();
+                    return -3;
+            }
+
+            /* Locate the value and period within */
+            j = i++;
+            period = NULL;
+            while (*i && *i != '}') {
+                if (*i == '.') {
+                    if (!period) {
+                        period = i;
+                    } else {
+                        info("invalid query (illegal period spotted at pos %ld)", i - str + 1);
+                        CLEANUP();
+                        return -2;
+                    }
+                } else if (!isalnum(*i) && *i != '-' && *i != '_') {
+                    info("invalid query (illegal character '%c' at pos %ld)", *i, i - str + 1);
+                    CLEANUP();
+                    return -2;
+                }
+                i++;
+            }
+            if (!*i) {
+                info("invalid query (non-terminated brace at pos %ld)", j - str + 1);
+                CLEANUP();
+                return -2;
+            }
+
+            /* Validate the enclosed string */
+            ssec = period ? period - j : 1;
+            skey = period ? i - period : i - j;
+            if (i - j <= 1) {
+                info("invalid query (empty braces at pos %ld)", j - str + 1);
+                CLEANUP();
+                return -2;
+            }
+            if ((period ? i - period : i - j) <= 1) {
+                info("invalid query (key name missing at pos %ld)", i - str);
+                CLEANUP();
+                return -2;
+            }
+
+            /* Extract section and key subcomponents */
+            if (!(sec = malloc(ssec * sizeof *sec))) {
                 info("memory error");
                 CLEANUP();
                 return -1;
-            } else if (err == STACK_INTERNAL_ERROR) {
-                STAMP();
-                error("stackPush internal error");
-                CLEANUP();
-                return -3;
             }
-        } else if (c == ')') {
-            int elem;
-            cur_tok = RPR;
-            elem = stackPop(parens);
-            if (elem != '(') {
+            if (!(key = malloc(skey * sizeof *key))) {
+                info("memory error");
+                free(sec);
                 CLEANUP();
-                if (elem == STACK_EMPTY) {
-                    info("invalid query (unbalanced parentheses)");
-                    return -2;
-                } else {
-                    STAMP();
-                    error("stackPop internal error (%d)", elem);
-                    return -3;
+                return -1;
+            }
+            strncpy(sec, j + 1, ssec);
+            strncpy(key, period ? period + 1 : j + 1, skey);
+            sec[ssec - 1] = '\0';
+            key[skey - 1] = '\0';
+
+            /* Get index in dataset */
+            if ((idx = datasetAdd(set, sec, key)) < 0) {
+                free(sec);
+                free(key);
+                switch (idx) {
+                    case -1:
+                        CLEANUP();
+                        return -1;
+                    case DATASET_INTERNAL_ERROR:
+                        STAMP();
+                        error("datasetAdd internal error");
+                        CLEANUP();
+                        return -3;
+                    default:
+                        STAMP();
+                        error("unmatched return code");
+                        CLEANUP();
+                        return -3;
                 }
             }
-        } else if (isspace(c)) {
-            cur_tok = SPACE;
+
+            /* Cleanup */
+            free(sec);
+            free(key);
+
+            /* Push index to the tokens stack */
+            SPUSH(tokens, idx);
+
+            i++;
+
+        } else if (*i == '(') {
+            cur_tok = LPR;
+
+            /* Catch syntax errors */
+            switch (last_tok) {
+                case BEGIN: case OP: case LPR:
+                    /* Gracefully break */
+                    break;
+                case VALUE: case RPR:
+                    /* Implicit multiplication */
+                    SPUSH(tokens, OP_MUL);
+                    break;
+                default:
+                    STAMP();
+                    error("invalid last_tok %d", last_tok);
+                    CLEANUP();
+                    return -3;
+            }
+
+            SPUSH(parens, '('); /* the exact value here doesn't matter */
+            SPUSH(tokens, OP_LPR);
+
+            i++;
+        } else if (*i == ')') {
+            cur_tok = RPR;
+
+            /* Catch syntax errors */
+            switch (last_tok) {
+                case VALUE: case RPR: case BEGIN:
+                    /* Gracefully break.
+                     * BEGIN is an error, but it will be caught
+                     * below by popping the parens stack. */
+                    break;
+                case OP:
+                    info("invalid query (missing operand between operator and closing parenthesis at pos %ld)", i - str + 1);
+                    CLEANUP();
+                    return -3;
+                case LPR:
+                    info("invalid query (missing expression inside parentheses at pos %ld)", i - str + 1);
+                    CLEANUP();
+                    return -3;
+                default:
+                    STAMP();
+                    error("invalid last_tok %d", last_tok);
+                    CLEANUP();
+                    return -3;
+            }
+
+            /* Find matching open parenthesis */
+            switch (stackPop(parens)) {
+                case STACK_EMPTY:
+                    info("invalid query (unbalanced parentheses)");
+                    CLEANUP();
+                    return -2;
+                case STACK_INTERNAL_ERROR:
+                    STAMP();
+                    error("stackPop internal error");
+                    CLEANUP();
+                    return -3;
+                default:
+                    /* Gracefully break */
+                    break;
+            }
+
+            SPUSH(tokens, OP_RPR);
+
+            i++;
+        } else if (strchr("+-*/%^", *i)) {
+            cur_tok = OP;
+
+            /* Catch syntax errors */
+            switch (last_tok) {
+                case VALUE: case RPR:
+                    /* Gracefully break */
+                    break;
+                case BEGIN:
+                    info("invalid query (missing operand before operator at pos %ld)", i - str + 1);
+                    CLEANUP();
+                    return -3;
+                case OP:
+                    info("invalid query (missing operand between two operators at pos %ld)", i - str + 1);
+                    CLEANUP();
+                    return -3;
+                case LPR:
+                    info("invalid query (missing operand between opening parenthesis and operator at pos %ld)", i - str + 1);
+                    CLEANUP();
+                    return -3;
+                default:
+                    STAMP();
+                    error("invalid last_tok %d", last_tok);
+                    CLEANUP();
+                    return -3;
+            }
+
+            switch (*i) {
+                case '+': SPUSH(tokens, OP_ADD); break;
+                case '-': SPUSH(tokens, OP_SUB); break;
+                case '*': SPUSH(tokens, OP_MUL); break;
+                case '/': SPUSH(tokens, OP_DIV); break;
+                case '%': SPUSH(tokens, OP_MOD); break;
+                case '^': SPUSH(tokens, OP_POW); break;
+                default:
+                    STAMP();
+                    error("unmatched character '%c'", *i);
+                    CLEANUP();
+                    return -3;
+            }
+
+            i++;
         } else {
-            info("illegal character '%c' in query", c);
+            info("invalid query (illegal character '%c')", *i);
             CLEANUP();
             return -2;
         }
-        cur_changed = (cur_tok != prev || strchr("+-*/^()", c)); /* single-character tokens are a guaranteed token change */
-        
-        /* If last_tok has been read in its entirety, parse it */
-        if (cur_changed && j != k) {
-            char tmp, *period;
-            int idx, err;
-            bool is_parsed = false;
-
-            switch (last_tok) {
-                case BEGIN:
-                    /* Do nothing */
-                    break;
-                case VAL:
-                    /* We use an ugly trick to help with parsing:
-                     * Store *i in tmp, then set *i to NULL to
-                     * treat j as a substring. After everything
-                     * set *i back to tmp.  */
-                    tmp = *i;
-                    memcpy(i, "", sizeof *i);
-                    period = strchr(j, '.');
-                    if (period == NULL) {
-                        /* the value is in the INI "global scope", outside of all sections */
-                        idx = datasetAdd(set, "", j);
-                    } else {
-                        /* Run some more error checks */
-                        if (*(period + 1) == '\0') {
-                            info("invalid query (blank key part in operand name)");
-                            CLEANUP();
-                            return -2;
-                        }
-                        if (strchr(period + 1, '.')) {
-                            info("invalid query (more than 1 period in operand name)");
-                            CLEANUP();
-                            return -2;
-                        }
-                        *period = '\0';
-                        idx = datasetAdd(set, j, period + 1);
-                        *period = '.';
-                    }
-
-                    /* Handle datasetAdd errors */
-                    if (idx < 0) {
-                        if (idx == -1) {
-                            info("memory error");
-                            CLEANUP();
-                            return -1;
-                        } else {
-                            STAMP();
-                            error("datasetAdd internal error (%d)", idx);
-                            CLEANUP();
-                            return -2;
-                        }
-                    }
-
-                    /* Finish the "ugly trick" */
-                    memcpy(i, &tmp, sizeof *i);
-                    is_parsed = true;
-                    break;
-                case OP: case LPR: case RPR:
-                    switch (*j) {
-                        case '+': idx = OP_ADD; break;
-                        case '-': idx = OP_SUB; break;
-                        case '*': idx = OP_MUL; break;
-                        case '/': idx = OP_DIV; break;
-                        case '%': idx = OP_MOD; break;
-                        case '^': idx = OP_POW; break;
-                        case '(': idx = OP_LPR; break;
-                        case ')': idx = OP_RPR; break;
-                        default:
-                            STAMP();
-                            error("failed to match operator '%c'", *j);
-                            CLEANUP();
-                            return -2;
-                    }
-
-                    is_parsed = true;
-                    break;
-                case END: case SPACE:
-                    /* last_tok should never be equal to END or SPACE */
-                    STAMP();
-                    error("last_tok set to END");
-                    CLEANUP();
-                    return -2;
-                default:
-                    STAMP();
-                    error("failed to match last_tok value in switch");
-                    CLEANUP();
-                    return -2;
-            }
-
-            /* If the token was correctly identified */
-            if (is_parsed) {
-
-                /* Push the new token */
-                err = stackPush(tokens, idx);
-                if (err == 1) {
-                    info("memory error");
-                    return -1;
-                } else if (err == STACK_INTERNAL_ERROR) {
-                    STAMP();
-                    error("stackPush internal error");
-                    return -3;
-                }
-
-                /* Update k */
-                k = j;
-            }
-        }
-
-        /* If a new token was found */
-        if (cur_changed && cur_tok != SPACE) {
-
-            /* Catch illegal pairs of adjacent tokens */
-            if (last_tok == VAL && cur_tok == VAL) {
-                info("invalid query (missing operator between two operands)");
-                CLEANUP();
-                return -2;
-            } else if (last_tok == OP && cur_tok == OP) {
-                info("invalid query (missing operand between two operators)");
-                CLEANUP();
-                return -2;
-            } else if (last_tok == OP && cur_tok == RPR) {
-                info("invalid query (missing operand before closing parenthesis)");
-                CLEANUP();
-                return -2;
-            } else if (last_tok == LPR && cur_tok == OP) {
-                info("invalid query (missing operand before operator)");
-                CLEANUP();
-                return -2;
-            } else if (last_tok == LPR && cur_tok == RPR) {
-                info("invalid query (missing expression inside parentheses)");
-                CLEANUP();
-                return -2;
-            } else if (last_tok == RPR && cur_tok == LPR) {
-                info("invalid query (missing operator between two parentheses blocks)");
-                CLEANUP();
-                return -2;
-            } else if (last_tok == VAL && cur_tok == LPR) {
-                info("invalid query (missing operator between operand and opening parenthesis)");
-                CLEANUP();
-                return -2;
-            } else if (last_tok == RPR && cur_tok == VAL) {
-                info("invalid query (missing operator between closing parenthesis and operand)");
-                CLEANUP();
-                return -2;
-            } else if (last_tok == BEGIN && cur_tok == OP) {
-                info("invalid query (missing operand before operator)");
-                CLEANUP();
-                return -2;
-            } else if (last_tok == OP && cur_tok == END) {
-                info("invalid query (missing operand after operator)");
-                CLEANUP();
-                return -2;
-            }
-
-            /* Update last token */
-            last_tok = cur_tok;
-            j = i;
-        }
-
-        /* Fetch next character / break out if finished */
-        if (*i++ == '\0') {
-            break;
-        }
-    }
-
-    /* Check for unbalanced parenteses */
-    if (parens->size != 0) {
-        info("invalid query (unbalanced parentheses)");
-        CLEANUP();
-        return -2;
     }
 
     /* Export results */
@@ -396,8 +417,9 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
     *set_ptr = set;
 
     /* Cleanup */
-    stackFree(parens);
 #undef CLEANUP
+#undef SPUSH
+    stackFree(parens);
 
     return tokens->size;
 }
