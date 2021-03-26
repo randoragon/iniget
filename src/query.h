@@ -48,9 +48,7 @@ enum OpCode
 /** Numerical representation of operator associativity. */
 enum OpAssoc
 {
-    /** Fully associative operators (like addition, multiplication). */
-    OP_ASSOC_ANY,
-    /** Left-associative operators (like division). */
+    /** Left-associative operators (most). */
     OP_ASSOC_LEFT,
     /** Right-associative operators (like exponentiation). */
     OP_ASSOC_RIGHT,

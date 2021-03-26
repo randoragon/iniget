@@ -11,8 +11,8 @@
 /* Define operator associativity */
 const OpAssoc opAssoc[OP_COUNT] = {
     /* padding */ OP_ASSOC_NA,
-    /* OP_ADD  */ OP_ASSOC_ANY,
-    /* OP_SUB  */ OP_ASSOC_ANY,
+    /* OP_ADD  */ OP_ASSOC_LEFT,
+    /* OP_SUB  */ OP_ASSOC_LEFT,
     /* OP_MUL  */ OP_ASSOC_LEFT,
     /* OP_DIV  */ OP_ASSOC_LEFT,
     /* OP_MOD  */ OP_ASSOC_LEFT,
@@ -482,7 +482,7 @@ int infixPostfix(Stack **postfix_ptr, const Stack *infix)
                     }
 
                     while (top != STACK_EMPTY
-                            && (opPrec[top] > prec || (opPrec[top] == prec && assoc == OP_ASSOC_LEFT))
+                            && (opPrec[-top] > prec || (opPrec[-top] == prec && assoc == OP_ASSOC_LEFT))
                             && top != OP_LPR) {
                         /* Pop top operator and add it to output (no error checking here, because
                          * we know from first call to stackPeek that stack is neither NULL nor empty). */
@@ -1031,16 +1031,6 @@ int printQueries(const Query **queries, size_t qcount)
                             num = (size_t)num_f;
 
                             s3 = s1 * num;
-                            if (s3 == 0) {
-                                /* Special case: 0-length string */
-                                if (!(i3.value.s = malloc(sizeof *i3.value.s))) {
-                                    info("memory error");
-                                    valstackFree(vstack);
-                                    return 1;
-                                }
-                                i3.value.s[0] = '\0';
-                                break;
-                            }
 
                             if (!(i3.value.s = malloc((s3 + 1) * sizeof *i3.value.s))) {
                                 info("memory error");
@@ -1050,6 +1040,7 @@ int printQueries(const Query **queries, size_t qcount)
                             for (k = 0; k < num; k++) {
                                 strcpy(i3.value.s + (k * s1), str);
                             }
+                            i3.value.s[s3] = '\0';
                             break;
                         case OP_ADD: case OP_SUB: case OP_DIV: /* fallthrough */
                         case OP_MOD: case OP_POW:
