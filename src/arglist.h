@@ -86,8 +86,9 @@ struct ArgVal
      * two strings are concatenated, the resulting string
      * needs to be freed separately from the "original"
      * strings that are stored in a query's @ref Query::args.
-     * For those strings (and those only), this flag is set
-     * to @c true, so that no memory is leaked.
+     * For such strings (and such only), this flag is set
+     * to @c true, so that no memory is leaked or double-freed.
+     * (this also applies to string multiplication etc.)
      */
     bool is_temporary;
 };
