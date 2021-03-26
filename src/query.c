@@ -568,11 +568,11 @@ void queryFree(Query *query)
 
 int runQueries(FILE *file, const Query **queries, size_t qcount)
 {
-    char   *line; /* Stores an entire line from file */
-    size_t lsize; /* Remembers the line size */
-    bool eof; /* True if EOF was read */
-    char *section; /* Remembers the current section */
-    size_t ssize; /* Remembers the section size */
+    char  *line;    /* Stores an entire line from file */
+    size_t lsize;   /* Remembers the line size */
+    bool   eof;     /* True if EOF was read */
+    char  *section; /* Remembers the current section */
+    size_t ssize;   /* Remembers the section size */
     size_t i;
 
     /* Allocate initial line and section buffers */
