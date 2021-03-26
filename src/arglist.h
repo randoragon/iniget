@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include <limits.h>
+#include <stdbool.h>
 
 /********************************************************
  *                     CONSTANTS                        *
@@ -20,10 +21,7 @@ enum ArgValType {
     /** uninitialized value */
     ARGVAL_TYPE_NONE,
 
-    /** integer */
-    ARGVAL_TYPE_INT,
-
-    /** double */
+    /** floating-point */
     ARGVAL_TYPE_FLOAT,
 
     /** string of characters */
@@ -78,10 +76,20 @@ struct ArgVal
 
     /** The value */
     union {
-        long i;
         double f;
         char *s;
     } value;
+
+    /** This flag only applies to @ref ARGVAL_TYPE_STRING.
+     *
+     * When evaluating queries in @ref printQueries, when
+     * two strings are concatenated, the resulting string
+     * needs to be freed separately from the "original"
+     * strings that are stored in a query's @ref Query::args.
+     * For those strings (and those only), this flag is set
+     * to @c true, so that no memory is leaked.
+     */
+    bool is_temporary;
 };
 
 

@@ -304,6 +304,7 @@ IniToken iniExtractFromLine(const char *line);
  *
  * @returns
  * - 0 - success
+ * - 1 - memory error
  * - 2 - internal error
  * - 3 - illegal operation (e.g. multiplying strings)
  */

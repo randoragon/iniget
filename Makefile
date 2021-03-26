@@ -2,7 +2,7 @@
 CC = cc
 LD = cc
 CFLAGS = -std=c89 -pedantic -Wall -Wextra
-LDFLAGS =
+LDFLAGS = -lm
 
 
 # Directories and files configuration

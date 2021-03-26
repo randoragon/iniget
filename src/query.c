@@ -5,6 +5,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include <math.h>
+#include <limits.h>
 
 /* Define operator associativity */
 const OpAssoc opAssoc[OP_COUNT] = {
@@ -660,7 +662,20 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
                         if (strcmp(section, sec) == 0
                                 && strcmp(tok.token.value.key, key) == 0
                                 && queries[i]->args->data[j].type == ARGVAL_TYPE_NONE) {
+
                             queries[i]->args->data[j] = tok.token.value.value;
+
+                            /* If the value type is string, deepcopy it */
+                            if (tok.token.value.value.type == ARGVAL_TYPE_STRING) {
+                                char *buf;
+                                if (!(buf = malloc((strlen(tok.token.value.value.value.s) + 1) * sizeof *buf))) {
+                                    info("memory error");
+                                    CLEANUP();
+                                    return 1;
+                                }
+                                strcpy(buf, tok.token.value.value.value.s);
+                                queries[i]->args->data[j].value.s = buf;
+                            }
                         }
                     }
                 }
@@ -838,30 +853,248 @@ IniToken iniExtractFromLine(const char *line)
 
 int printQueries(const Query **queries, size_t qcount)
 {
-    size_t i;
+    ValStack *vstack; /* evaluation stack */
+    size_t i, j;
 
-    for (i = 0; i < qcount; i++) {
-        size_t j;
+    /* Debug print */
+    {
+        size_t i;
+        for (i = 0; i < qcount; i++) {
+            size_t j;
 
-        printf("-> query #%lu\n", i);
-        for (j = 0; j < queries[i]->data->size; j++) {
-            printf("\tsection: \"%s\"\n\tkey: \"%s\"\n", queries[i]->data->data[j].section, queries[i]->data->data[j].key);
-            switch (queries[i]->args->data[j].type) {
-                case ARGVAL_TYPE_INT:
-                    printf("\ttype: INT\n\tvalue: %ld\n", queries[i]->args->data[j].value.i);
-                    break;
-                case ARGVAL_TYPE_FLOAT:
-                    printf("\ttype: FLOAT\n\tvalue: %f\n", queries[i]->args->data[j].value.f);
-                    break;
-                case ARGVAL_TYPE_STRING:
-                    printf("\ttype: STRING\n\tvalue: \"%s\"\n", queries[i]->args->data[j].value.s);
-                    break;
-                default:
-                    printf("\ttype: ERROR\n\tvalue: ERROR\n");
-                    break;
+            printf("-> query #%lu\n", i);
+            for (j = 0; j < queries[i]->data->size; j++) {
+                printf("\tsection: \"%s\"\n\tkey: \"%s\"\n", queries[i]->data->data[j].section, queries[i]->data->data[j].key);
+                switch (queries[i]->args->data[j].type) {
+                    case ARGVAL_TYPE_FLOAT:
+                        printf("\ttype: FLOAT\n\tvalue: %f\n", queries[i]->args->data[j].value.f);
+                        break;
+                    case ARGVAL_TYPE_STRING:
+                        printf("\ttype: STRING\n\tvalue: \"%s\"\n", queries[i]->args->data[j].value.s);
+                        break;
+                    default:
+                        printf("\ttype: ERROR\n\tvalue: ERROR\n");
+                        break;
+                }
+                putchar('\n');
             }
-            putchar('\n');
         }
     }
+
+    if (!(vstack = valstackCreate())) {
+        info("memory error");
+        return 1;
+    }
+
+    for (i = 0; i < qcount; i++) {
+        const Query *const query = queries[i]; /* shortcut */
+        const Stack *const op_stack = query->op_stack; /* shortcut */
+        ArgVal result;
+
+        for (j = 0; j < op_stack->size; j++) {
+            int idx, err;
+
+            idx = op_stack->data[j];
+
+            if (idx >= 0) {
+                ArgVal val;
+
+                if (idx >= (int)query->data->size) {
+                    STAMP();
+                    error("op_stack index (%d) out of DataSet range (%d)", idx, query->data->size);
+                    valstackFree(vstack);
+                    return 2;
+                }
+
+                /* Push value onto the vstack */
+                val = query->args->data[idx];
+                if ((err = valstackPush(vstack, val))) {
+                    STAMP();
+                    error("failed to push value onto vstack");
+                    valstackFree(vstack);
+                    return (err == 1)? 1 : 2;
+                }
+            } else {
+                /* Pop 2 operands and push operation result */
+                ArgVal i1, i2, i3;
+
+                i2 = valstackPop(vstack);
+                if (i2.type == ARGVAL_TYPE_NONE) {
+                    STAMP();
+                    error("failed to pop from vstack (%.0d)", i2.value.f);
+                    valstackFree(vstack);
+                    return 2;
+                }
+
+                i1 = valstackPop(vstack);
+                if (i1.type == ARGVAL_TYPE_NONE) {
+                    STAMP();
+                    error("failed to pop from vstack (%.0d)", i1.value.f);
+                    valstackFree(vstack);
+                    return 2;
+                }
+
+                /* Perform operation */
+                if (i1.type == ARGVAL_TYPE_FLOAT && i2.type == ARGVAL_TYPE_FLOAT) {
+                    i3.type = ARGVAL_TYPE_FLOAT;
+                    switch (idx) {
+                        case OP_ADD:
+                            i3.value.f = i1.value.f + i2.value.f;
+                            break;
+                        case OP_SUB:
+                            i3.value.f = i1.value.f - i2.value.f;
+                            break;
+                        case OP_MUL:
+                            i3.value.f = i1.value.f * i2.value.f;
+                            break;
+                        case OP_DIV:
+                            i3.value.f = i1.value.f / i2.value.f;
+                            break;
+                        case OP_MOD:
+                            i3.value.f = fmod(i1.value.f, i2.value.f);
+                            break;
+                        case OP_POW:
+                            i3.value.f = pow(i1.value.f, i2.value.f);
+                            break;
+                        default:
+                            STAMP();
+                            error("unmatched operator index (%d)", idx);
+                            valstackFree(vstack);
+                            return 2;
+                    }
+                } else if (i1.type == ARGVAL_TYPE_STRING && i2.type == ARGVAL_TYPE_STRING) {
+                    size_t s1, s3;
+                    i3.type = ARGVAL_TYPE_STRING;
+                    switch (idx) {
+                        case OP_ADD:
+                            s1 = strlen(i1.value.s);
+                            s3 = s1 + strlen(i2.value.s);
+                            if (!(i3.value.s = malloc((s3 + 1) * sizeof *i3.value.s))) {
+                                info("memory error");
+                                valstackFree(vstack);
+                                return 1;
+                            }
+                            strcpy(i3.value.s, i1.value.s);
+                            strcpy(i3.value.s + s1, i2.value.s);
+                            i3.is_temporary = true;
+                            break;
+                        case OP_SUB: case OP_MUL: case OP_DIV: /* fallthrough */
+                        case OP_MOD: case OP_POW:
+                            info("illegal operation on two STRING values");
+                            valstackFree(vstack);
+                            return 3;
+                        default:
+                            STAMP();
+                            error("unmatched operator index (%d)", idx);
+                            valstackFree(vstack);
+                            return 2;
+                    }
+                } else if ((i1.type == ARGVAL_TYPE_STRING && i2.type == ARGVAL_TYPE_FLOAT)
+                        || (i1.type == ARGVAL_TYPE_FLOAT && i2.type == ARGVAL_TYPE_STRING)) {
+                    
+                    size_t s1, s3;
+                    const char *str;
+                    double num_f;
+                    size_t num, k;
+
+                    switch (idx) {
+                        case OP_MUL:
+                            /* Support Python-like string multiplication */
+                            i3.type = ARGVAL_TYPE_STRING;
+                            i3.is_temporary = true;
+
+                            if (i1.type == ARGVAL_TYPE_STRING) {
+                                str = i1.value.s;
+                                num_f = i2.value.f;
+                            } else {
+                                str = i2.value.s;
+                                num_f = i1.value.f;
+                            }
+
+                            s1 = strlen(str);
+
+                            /* Prevent integer overflow */
+                            if (i2.value.f > (double)ULONG_MAX) {
+                                info("cannot multiply STRING by %.0g (factor too large)", i2.value.f);
+                                valstackFree(vstack);
+                                return 3;
+                            } else if (i2.value.f > (double)ULONG_MAX / s1 - 1) {
+                                info("cannot multiply STRING by %.0g (resulting string too long)", i2.value.f);
+                                valstackFree(vstack);
+                                return 3;
+                            }
+                            num = (size_t)num_f;
+
+                            s3 = s1 * num;
+
+                            if (!(i3.value.s = malloc((s3 + 1) * sizeof *i3.value.s))) {
+                                info("memory error");
+                                valstackFree(vstack);
+                                return 1;
+                            }
+                            for (k = 0; k < num; k++) {
+                                strcpy(i3.value.s + (k * s1), str);
+                            }
+                            break;
+                        case OP_ADD: case OP_SUB: case OP_DIV: /* fallthrough */
+                        case OP_MOD: case OP_POW:
+                            info("illegal operation on STRING and FLOAT");
+                            valstackFree(vstack);
+                            return 3;
+                        default:
+                            STAMP();
+                            error("unmatched operator index (%d)", idx);
+                            valstackFree(vstack);
+                            return 2;
+                    }
+                } else {
+                    info("illegal operation involving %s and %s",
+                            (i1.type == ARGVAL_TYPE_STRING)? "STRING" : "FLOAT",
+                            (i2.type == ARGVAL_TYPE_STRING)? "STRING" : "FLOAT");
+                    valstackFree(vstack);
+                    return 3;
+                }
+
+                /* Free temporary strings */
+                if (i1.type == ARGVAL_TYPE_STRING && i1.is_temporary) {
+                    free(i1.value.s);
+                }
+                if (i2.type == ARGVAL_TYPE_STRING && i2.is_temporary) {
+                    free(i2.value.s);
+                }
+
+                /* Push the new value */
+                if (valstackPush(vstack, i3)) {
+                    info("memory error");
+                    valstackFree(vstack);
+                    return 1;
+                }
+            }
+        }
+
+        /* Result is on the top of the stack */
+        result = valstackPop(vstack);
+        switch (result.type) {
+            case ARGVAL_TYPE_STRING:
+                printf("%s\n", result.value.s);
+                free(result.value.s);
+                break;
+            case ARGVAL_TYPE_FLOAT:
+                printf("%g\n", result.value.f);
+                break;
+            default:
+                STAMP();
+                error("query result has invalid type %d", result.type);
+                valstackFree(vstack);
+                return 2;
+        }
+
+        /* Clear the stack */
+        valstackClear(vstack);
+    }
+
+    /* Cleanup */
+    valstackFree(vstack);
+
     return 0;
 }

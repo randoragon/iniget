@@ -41,7 +41,6 @@ void arglistClear(ArgList *arglist)
 
     for (i = 0; i < arglist->size; i++) {
         if (arglist->data[i].type == ARGVAL_TYPE_STRING) {
-            printf("freed ARGVAL_TYPE_STRING buffer %p\n", arglist->data[i].value.s);
             free(arglist->data[i].value.s);
         }
         arglist->data[i].type = ARGVAL_TYPE_NONE;
@@ -112,7 +111,7 @@ ArgVal argValGetFromString(const char *str)
             }
         }
         if (ret.type == ARGVAL_TYPE_NONE) {
-            ret.type = periods ? ARGVAL_TYPE_FLOAT : ARGVAL_TYPE_INT;
+            ret.type = ARGVAL_TYPE_FLOAT;
         }
 
         switch (ret.type) {
@@ -123,14 +122,11 @@ ArgVal argValGetFromString(const char *str)
                     ret.type = ARGVAL_TYPE_NONE;
                     return ret;
                 }
-                printf("created ARGVAL_TYPE_STRING buffer %p\n", ret.value.s);
 
                 /* Store the string */
                 strncpy(ret.value.s, beg, end - beg + 2);
                 ret.value.s[end - beg + 1] = '\0';
-                break;
-            case ARGVAL_TYPE_INT:
-                ret.value.i = atol(beg);
+                ret.is_temporary = false;
                 break;
             case ARGVAL_TYPE_FLOAT:
                 ret.value.f = atof(beg);

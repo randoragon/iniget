@@ -27,6 +27,9 @@ int main(int argc, char **argv)
         Query *q;
 
         if (parseQueryString(&q, argv[i])) {
+            while (i-- > 1) {
+                queryFree(queries[i-1]);
+            }
             free(queries);
             return EXIT_FAILURE;
         }
