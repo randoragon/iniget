@@ -822,7 +822,7 @@ IniToken iniExtractFromLine(const char *line)
         }
         strncpy(ret.token.section, j, i - j + 1);
         ret.token.section[i - j] = '\0';
-    } else if (isalnum(*i) || *i == '_') {
+    } else if (isalnum(*i) || *i == '_' || *i == '-') {
         char *val; /* Storage for the value part */
 
         ret.type = INI_LINE_VALUE;
@@ -1122,7 +1122,9 @@ int printQueries(const Query **queries, size_t qcount)
         switch (result.type) {
             case ARGVAL_TYPE_STRING:
                 printf("%s\n", result.value.s);
-                free(result.value.s);
+                if (result.is_temporary) {
+                    free(result.value.s);
+                }
                 break;
             case ARGVAL_TYPE_FLOAT:
                 printf("%g\n", result.value.f);
