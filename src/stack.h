@@ -26,10 +26,10 @@
  *                      TYPEDEFS                        *
  ********************************************************/
 
-/** cond */
+/** @cond */
 typedef struct Stack Stack;
 typedef struct ValStack ValStack;
-/** endcond */
+/** @endcond */
 
 
 /********************************************************
@@ -136,8 +136,8 @@ int valstackPush(ValStack *valstack, ArgVal val);
  *
  * @returns
  * - if @ref ArgVal::type is @ref ARGVAL_TYPE_NONE
- *      - if @ref ArgVal::value::f is 0 - stack is empty
- *      - if @ref ArgVal::value::f is not 0 - internal error
+ *      - if @ref ArgVal::value's @c f is 0 - stack is empty
+ *      - if @ref ArgVal::value's @c f is not 0 - internal error
  * - anything else - success
  */
 ArgVal valstackPop(ValStack *valstack);
@@ -146,8 +146,8 @@ ArgVal valstackPop(ValStack *valstack);
  *
  * @returns
  * - if @ref ArgVal::type is @ref ARGVAL_TYPE_NONE
- *      - if @ref ArgVal::value::f is 0 - stack is empty
- *      - if @ref ArgVal::value::f is not 0 - internal error
+ *      - if @ref ArgVal::value's @c f is 0 - stack is empty
+ *      - if @ref ArgVal::value's @c f is not 0 - internal error
  * - anything else - success
  */
 ArgVal valstackPeek(const ValStack *valstack);
