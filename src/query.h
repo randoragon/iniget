@@ -252,6 +252,7 @@ void queryFree(Query *query);
  * - 1 - memory error (malloc/realloc)
  * - 2 - internal error
  * - 3 - illegal operation (e.g. multiplying strings)
+ * - 4 - value not found in file
  */
 int runQueries(FILE *file, const Query **queries, size_t qcount);
 

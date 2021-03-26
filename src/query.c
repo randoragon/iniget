@@ -573,6 +573,7 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
     bool   eof;     /* True if EOF was read */
     char  *section; /* Remembers the current section */
     size_t ssize;   /* Remembers the section size */
+    size_t matches; /* The number of yet-to-be-found section/value pairs */
     size_t i;
 
     /* Allocate initial line and section buffers */
@@ -589,9 +590,11 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
     }
     section[0] = '\0'; /* Initialize section to none ("global scope") */
 
-    /* Reset all query args to BLANK */
+    /* Reset all query args to BLANK and count expected matches*/
+    matches = 0;
     for (i = 0; i < qcount; i++) {
         arglistClear(queries[i]->args);
+        matches += queries[i]->args->size;
     }
 
     /* Temporary convenience macro */
@@ -676,6 +679,8 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
                                 strcpy(buf, tok.token.value.value.value.s);
                                 queries[i]->args->data[j].value.s = buf;
                             }
+
+                            matches--;
                         }
                     }
                 }
@@ -694,6 +699,23 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
         }
 
     } while (!eof);
+
+    /* Report not found values */
+    if (matches) {
+        info("failed to find the following values:");
+        for (i = 0; i < qcount; i++) {
+            size_t j;
+            for (j = 0; j < queries[i]->args->size; j++) {
+                const Data *const data = queries[i]->data->data + j; /* cache */
+
+                if (queries[i]->args->data[j].type == ARGVAL_TYPE_NONE) {
+                    fprintf(stderr, "->\t%s%s%s\n", data->section, (*data->section)? "." : "", data->key);
+                }
+            }
+        }
+        CLEANUP();
+        return 4;
+    }
 
     /* Cleanup */
     free(line);
