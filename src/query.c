@@ -985,7 +985,7 @@ int printQueries(const Query **queries, size_t qcount)
                             break;
                         case OP_SUB: case OP_MUL: case OP_DIV: /* fallthrough */
                         case OP_MOD: case OP_POW:
-                            info("illegal operation on two STRING values");
+                            info("illegal operation on two strings");
                             valstackFree(vstack);
                             return 3;
                         default:
@@ -1020,11 +1020,11 @@ int printQueries(const Query **queries, size_t qcount)
 
                             /* Prevent integer overflow */
                             if (i2.value.f > (double)ULONG_MAX) {
-                                info("cannot multiply STRING by %.0g (factor too large)", i2.value.f);
+                                info("cannot multiply a string by %.0g (factor too large)", i2.value.f);
                                 valstackFree(vstack);
                                 return 3;
                             } else if (i2.value.f > (double)ULONG_MAX / s1 - 1) {
-                                info("cannot multiply STRING by %.0g (resulting string too long)", i2.value.f);
+                                info("cannot multiply a string by %.0g (resulting string too long)", i2.value.f);
                                 valstackFree(vstack);
                                 return 3;
                             }
@@ -1053,7 +1053,7 @@ int printQueries(const Query **queries, size_t qcount)
                             break;
                         case OP_ADD: case OP_SUB: case OP_DIV: /* fallthrough */
                         case OP_MOD: case OP_POW:
-                            info("illegal operation on STRING and FLOAT");
+                            info("illegal operation on a string and a number");
                             valstackFree(vstack);
                             return 3;
                         default:
@@ -1063,9 +1063,9 @@ int printQueries(const Query **queries, size_t qcount)
                             return 2;
                     }
                 } else {
-                    info("illegal operation involving %s and %s",
-                            (i1.type == ARGVAL_TYPE_STRING)? "STRING" : "FLOAT",
-                            (i2.type == ARGVAL_TYPE_STRING)? "STRING" : "FLOAT");
+                    info("illegal operation involving a %s and a %s",
+                            (i1.type == ARGVAL_TYPE_STRING)? "string" : "number",
+                            (i2.type == ARGVAL_TYPE_STRING)? "string" : "number");
                     valstackFree(vstack);
                     return 3;
                 }
