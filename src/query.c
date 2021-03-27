@@ -1088,7 +1088,7 @@ int printQueries(const Query **queries, size_t qcount)
                 }
                 break;
             case ARGVAL_TYPE_FLOAT:
-                printf("%g\n", result.value.f);
+                printf("%.10g\n", result.value.f);
                 break;
             default:
                 STAMP();
