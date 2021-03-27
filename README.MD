@@ -53,6 +53,9 @@ and their results get printed on separate lines in the same order.
 
 ## Installation
 
+Arch Linux users can install the [iniget-git](https://aur.archlinux.org/packages/iniget-git/)
+package from the AUR.
+
 Download the repository and run the following (if necessary, as root):
 
     make install
