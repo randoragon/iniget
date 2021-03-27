@@ -85,14 +85,14 @@ int parseQueryString(Query **query_ptr, const char *str)
         }
 
         /* Store the results in new query */
-        new->data = set;
+        new->set = set;
         new->op_stack = tokens_postfix;
 
         stackFree(tokens_infix);
     }
 
     /* Create an adequately-sized arglist */
-    if (!(new->args = arglistCreate(new->data->size))) {
+    if (!(new->args = arglistCreate(new->set->size))) {
         info("memory error");
         free(new);
         free(str_cpy);
@@ -567,7 +567,7 @@ void queryFree(Query *query)
         return;
     }
 
-    datasetFree(query->data);
+    datasetFree(query->set);
     arglistFree(query->args);
     stackFree(query->op_stack);
     free(query);
@@ -648,7 +648,7 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
                 return 2;
             case INI_LINE_SECTION:
                 /* Update section string */
-                if (ssize < strlen(tok.token.section) + 1) {
+                if (ssize < strlen(tok.content.section) + 1) {
                     ssize *= 2;
                     if (!(section = realloc(section, ssize * sizeof *section))) {
                         info("memory error");
@@ -656,34 +656,34 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
                         return 1;
                     }
                 }
-                strcpy(section, tok.token.section);
-                free(tok.token.section);
+                strcpy(section, tok.content.section);
+                free(tok.content.section);
                 break;
-            case INI_LINE_VALUE:
+            case INI_LINE_KVPAIR:
                 /* Populate matched query parameters with value */
                 for (i = 0; i < qcount; i++) {
                     size_t j;
-                    for (j = 0; j < queries[i]->data->size; j++) {
+                    for (j = 0; j < queries[i]->set->size; j++) {
                         /* Cache deeply nested variables */
-                        char *sec = queries[i]->data->data[j].section;
-                        char *key = queries[i]->data->data[j].key;
+                        char *sec = queries[i]->set->data[j].section;
+                        char *key = queries[i]->set->data[j].key;
 
                         /* Copy in-file value into all matched indices in arglists */
                         if (strcmp(section, sec) == 0
-                                && strcmp(tok.token.value.key, key) == 0
+                                && strcmp(tok.content.kvpair.key, key) == 0
                                 && queries[i]->args->data[j].type == ARGVAL_TYPE_NONE) {
 
-                            queries[i]->args->data[j] = tok.token.value.value;
+                            queries[i]->args->data[j] = tok.content.kvpair.value;
 
                             /* If the value type is string, deepcopy it */
-                            if (tok.token.value.value.type == ARGVAL_TYPE_STRING) {
+                            if (tok.content.kvpair.value.type == ARGVAL_TYPE_STRING) {
                                 char *buf;
-                                if (!(buf = malloc((strlen(tok.token.value.value.value.s) + 1) * sizeof *buf))) {
+                                if (!(buf = malloc((strlen(tok.content.kvpair.value.value.s) + 1) * sizeof *buf))) {
                                     info("memory error");
                                     CLEANUP();
                                     return 1;
                                 }
-                                strcpy(buf, tok.token.value.value.value.s);
+                                strcpy(buf, tok.content.kvpair.value.value.s);
                                 queries[i]->args->data[j].value.s = buf;
                             }
 
@@ -691,9 +691,9 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
                         }
                     }
                 }
-                free(tok.token.value.key);
-                if (tok.token.value.value.type == ARGVAL_TYPE_STRING) {
-                    free(tok.token.value.value.value.s);
+                free(tok.content.kvpair.key);
+                if (tok.content.kvpair.value.type == ARGVAL_TYPE_STRING) {
+                    free(tok.content.kvpair.value.value.s);
                 }
                 break;
             case INI_LINE_BLANK:
@@ -713,7 +713,7 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
         for (i = 0; i < qcount; i++) {
             size_t j;
             for (j = 0; j < queries[i]->args->size; j++) {
-                const Data *const data = queries[i]->data->data + j; /* cache */
+                const Data *const data = queries[i]->set->data + j; /* cache */
 
                 if (queries[i]->args->data[j].type == ARGVAL_TYPE_NONE) {
                     fprintf(stderr, "->\t%s%s%s\n", data->section, (*data->section)? "." : "", data->key);
@@ -800,17 +800,17 @@ IniToken iniExtractFromLine(const char *line)
         }
         
         /* Store the section name in a new buffer */
-        if (!(ret.token.section = malloc((i - j + 1) * sizeof *ret.token.section))) {
+        if (!(ret.content.section = malloc((i - j + 1) * sizeof *ret.content.section))) {
             info("memory error");
             ret.type = INI_LINE_ERROR;
             return ret;
         }
-        strncpy(ret.token.section, j, i - j + 1);
-        ret.token.section[i - j] = '\0';
+        strncpy(ret.content.section, j, i - j + 1);
+        ret.content.section[i - j] = '\0';
     } else if (isalnum(*i) || *i == '_' || *i == '-') {
         char *val; /* Storage for the value part */
 
-        ret.type = INI_LINE_VALUE;
+        ret.type = INI_LINE_KVPAIR;
 
         /* Find end of the key part */
         j = i;
@@ -823,13 +823,13 @@ IniToken iniExtractFromLine(const char *line)
         }
 
         /* Store the key part in a new buffer */
-        if (!(ret.token.value.key = malloc((i - j + 1) * sizeof *ret.token.value.key))) {
+        if (!(ret.content.kvpair.key = malloc((i - j + 1) * sizeof *ret.content.kvpair.key))) {
             info("memory error");
             ret.type = INI_LINE_ERROR;
             return ret;
         }
-        strncpy(ret.token.value.key, j, i - j + 1);
-        ret.token.value.key[i - j] = '\0';
+        strncpy(ret.content.kvpair.key, j, i - j + 1);
+        ret.content.kvpair.key[i - j] = '\0';
 
         /* Search for '=' delimiter */
         while (*i && *i != '=')
@@ -865,8 +865,8 @@ IniToken iniExtractFromLine(const char *line)
         val[i - j] = '\0';
 
         /* Determine type of the value */
-        ret.token.value.value = argValGetFromString(val);
-        if (ret.token.value.value.type == ARGVAL_TYPE_NONE) {
+        ret.content.kvpair.value = argValGetFromString(val);
+        if (ret.content.kvpair.value.type == ARGVAL_TYPE_NONE) {
             ret.type = INI_LINE_ERROR;
         }
         free(val);
@@ -904,9 +904,9 @@ int printQueries(const Query **queries, size_t qcount)
             if (idx >= 0) {
                 ArgVal val;
 
-                if (idx >= (int)query->data->size) {
+                if (idx >= (int)query->set->size) {
                     STAMP();
-                    error("op_stack index (%d) out of DataSet range (%d)", idx, query->data->size);
+                    error("op_stack index (%d) out of DataSet range (%d)", idx, query->set->size);
                     valstackFree(vstack);
                     return 2;
                 }

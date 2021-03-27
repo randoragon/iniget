@@ -63,7 +63,7 @@ enum IniLineType
     INI_LINE_SECTION,
 
     /** A key/value pair in format "key = value" */
-    INI_LINE_VALUE,
+    INI_LINE_KVPAIR,
 
     /** A blank line or a comment starting with ';' */
     INI_LINE_BLANK,
@@ -123,7 +123,7 @@ extern const int opPrec[OP_COUNT];
 struct Query
 {
     /** An ordered set of all section/value pairs relevant to the query. */
-    DataSet *data;
+    DataSet *set;
 
     /** A reserved space for populating with values referenced by @ref data,
      * with the same indexing (see @ref ArgList for more details).
@@ -157,8 +157,8 @@ struct IniToken
 
             /** The value component of the pair. */
             ArgVal value;
-        } value;
-    } token;
+        } kvpair;
+    } content;
 };
 
 /********************************************************
