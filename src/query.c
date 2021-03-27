@@ -786,7 +786,7 @@ IniToken iniExtractFromLine(const char *line)
         /* Scan for the end of section */
         j = ++i;
         while (*i && *i != ']') {
-            if (!isalnum(*i) && *i != '_') {
+            if (!isalnum(*i) && *i != '-' && *i != '_') {
                 info("error found in file (illegal character '%c' in section name)", *i);
                 ret.type = INI_LINE_ERROR;
                 return ret;
