@@ -105,7 +105,7 @@ ArgVal argValGetFromString(const char *str)
         /* Determine the value type */
         ret.type = ARGVAL_TYPE_NONE;
         for (i = beg, periods = 0; i <= end; i++) {
-            if ((*i != '.' && !isdigit(*i)) || (*i == '.' && ++periods != 1)) {
+            if ((*i != '.' && !isdigit(*i) && !(*i == '-' && i == beg)) || (*i == '.' && ++periods != 1)) {
                 ret.type = ARGVAL_TYPE_STRING;
                 break;
             }
