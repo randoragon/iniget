@@ -305,7 +305,7 @@ IniToken iniExtractFromLine(const char *line);
  * - 0 - success
  * - 1 - memory error
  * - 2 - internal error
- * - 3 - illegal operation (e.g. multiplying strings)
+ * - 3 - illegal operation (e.g. subtracting strings, division by 0)
  */
 int printQueries(const Query **queries, size_t qcount);
 

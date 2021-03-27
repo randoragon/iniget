@@ -953,6 +953,11 @@ int printQueries(const Query **queries, size_t qcount)
                             i3.value.f = i1.value.f * i2.value.f;
                             break;
                         case OP_DIV:
+                            if (i2.value.f == 0) {
+                                info("cannot divide by 0");
+                                valstackFree(vstack);
+                                return 3;
+                            }
                             i3.value.f = i1.value.f / i2.value.f;
                             break;
                         case OP_MOD:
