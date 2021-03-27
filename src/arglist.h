@@ -48,14 +48,14 @@ typedef enum ArgValType ArgValType;
  * This structure is used during the initial stage of
  * running a @ref Query (@ref runQueries). Since each
  * query is file-agnostic, it only holds strings denoting
- * the names of section/key pairs (@ref Query::data) to be used
+ * the names of section/key pairs (@ref Query::set) to be used
  * during computation. For the computation stage, however,
  * these section/key pairs are useless, as we are interested
  * in the actual in-file values. That's why, prior to
  * computation, an ArgList is populated with the needed values
  * (each query gets its own ArgList (@ref Query::args), and
  * each ArgList is indexed exactly like that query's @ref
- * Query::data array).
+ * Query::set array).
  */
 struct ArgList
 {

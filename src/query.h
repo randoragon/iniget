@@ -125,7 +125,7 @@ struct Query
     /** An ordered set of all section/value pairs relevant to the query. */
     DataSet *set;
 
-    /** A reserved space for populating with values referenced by @ref data,
+    /** A reserved space for populating with values referenced by @ref set,
      * with the same indexing (see @ref ArgList for more details).
      */
     ArgList *args;
@@ -133,7 +133,7 @@ struct Query
     /** Operation stack in postfix format to remove all ambiguity.
      *
      * The stack consists of two types of numbers:
-     * - indices to @ref data, which represent values
+     * - indices to @ref set, which represent values
      * - operators (negative values by convention, see enum OpCode)
      */
     Stack *op_stack;

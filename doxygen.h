@@ -6,20 +6,15 @@
  * It is targeted at developers trying to understand the inner-workings
  * of the program, not casual users (for that you can see
  * <a href="https://github.com/randoragon/iniget/tree/main/README.MD">README</a>).
- * 
- * @c iniget is not a complicated program, but its code base is messy enough to
- * make reading a bit difficult, and orderly enough to benefit from a good
- * explanation of its components.
  *
- * @section toc Table of Contents
+ * The code base makes an extensive use of comments to explain the general flow
+ * of the program and each structure/function/constant should be explained in
+ * decent detail in its header file, which is then available for viewing here.
+ * <br/>In general, the Doxygen documentation contains explanation of each individual
+ * component of the program, while source files (which are not parsed by Doxygen)
+ * contain comments explaining what the program does with these components.
  *
- * Note that this Table of Contents lists only documentation written as separate
- * pages of information, to form a foundation for understanding the actual source code.
- * These pages, however, are only a small part of the entire documentation.
- * A substantial chunk is written for specific structures, functions and variables only,
- * so be sure to refer to those in order to fill some gaps.
- *
- * 1. @ref main
+ * Project Homepage: https://github.com/randoragon/iniget
  *
  * @section Credits
  *
@@ -29,9 +24,4 @@
  * - Discord: Randoragon#1958
  * - Discord Server: https://discord.gg/YqJYzMS
  * - GitHub: https://github.com/randoragon
- */
-
-/** @page main Program Anatomy and Design
- *
- * work in progress
  */
