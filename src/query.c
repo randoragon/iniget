@@ -391,7 +391,7 @@ int tokenizeQueryString(Stack **tokens_ptr, DataSet **set_ptr, char *str)
 
             i++;
         } else {
-            info("invalid query (illegal character '%c')", *i);
+            info("invalid query (illegal character '%c' at pos %ld)", *i, i - str + 1);
             CLEANUP();
             return -2;
         }
