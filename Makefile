@@ -12,7 +12,7 @@ SRCS := $(wildcard $(SRCDIR)/*.c)
 OBJS := $(patsubst $(SRCDIR)/%, $(OBJDIR)/%, $(SRCS:.c=.o))
 TARGET = iniget
 DESTDIR =
-PREFIX = /usr/local
+PREFIX = /usr/local/bin
 
 .PHONY: all dirs main clean debug install
 
@@ -35,6 +35,6 @@ debug: clean all
 
 install: CFLAGS += -O3
 install: clean all
-	@mkdir -p -- ${DESTDIR}${PREFIX}/bin
-	cp -f -- $(TARGET) ${DESTDIR}${PREFIX}/bin
-	@chmod 755 -- ${DESTDIR}${PREFIX}/bin/$(TARGET)
+	@mkdir -p -- ${DESTDIR}${PREFIX}/
+	cp -f -- $(TARGET) ${DESTDIR}${PREFIX}/
+	@chmod 755 -- ${DESTDIR}${PREFIX}/$(TARGET)
