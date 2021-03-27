@@ -705,6 +705,11 @@ int runQueries(FILE *file, const Query **queries, size_t qcount)
                 CLEANUP();
         }
 
+        /* If all matches were found, stop reading */
+        if (matches == 0) {
+            eof = true;
+        }
+
     } while (!eof);
 
     /* Report not found values */
