@@ -63,7 +63,7 @@ struct DataSet
 {
     /** The array of section/key pairs. */
     Data *data;
-    
+
     /** The number of elements in @ref data. */
     size_t size;
 

@@ -500,7 +500,7 @@ int infixPostfix(Stack **postfix_ptr, const Stack *infix)
                     SPUSH(ops, tok);
                     break;
                 case OP_RPR:
-                    
+
                     /* Store the top ops stack operator */
                     top = stackPeek(ops);
                     if (top == STACK_INTERNAL_ERROR) {
@@ -787,7 +787,7 @@ IniToken iniExtractFromLine(const char *line)
 
     if (*i == '[') {
         ret.type = INI_LINE_SECTION;
-        
+
         /* Scan for the end of section */
         j = ++i;
         while (*i && *i != ']') {
@@ -803,7 +803,7 @@ IniToken iniExtractFromLine(const char *line)
             ret.type = INI_LINE_ERROR;
             return ret;
         }
-        
+
         /* Store the section name in a new buffer */
         if (!(ret.content.section = malloc((i - j + 1) * sizeof *ret.content.section))) {
             info("memory error");
@@ -859,7 +859,7 @@ IniToken iniExtractFromLine(const char *line)
         j = i;
         while (*i++)
             ;
-        
+
         /* Store the value part in a new buffer */
         if (!(val = malloc((i - j + 1) * sizeof *val))) {
             info("memory error");
@@ -1005,7 +1005,7 @@ int printQueries(const Query **queries, size_t qcount)
                     }
                 } else if ((i1.type == ARGVAL_TYPE_STRING && i2.type == ARGVAL_TYPE_FLOAT)
                         || (i1.type == ARGVAL_TYPE_FLOAT && i2.type == ARGVAL_TYPE_STRING)) {
-                    
+
                     size_t s1, s3;
                     const char *str;
                     double num_f;

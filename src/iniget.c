@@ -23,7 +23,7 @@ int main(int argc, char **argv)
         help();
         return 0;
     }
-    
+
     /* Determine input stream */
     if (strcmp(argv[1], "-") == 0) {
         input = stdin;

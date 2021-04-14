@@ -136,7 +136,7 @@ ArgVal argValGetFromString(const char *str)
                 break;
         }
     }
-    
+
     /* All strings processed by this function
      * come directly from an INI file, so therefore
      * they are not "temporary". */
