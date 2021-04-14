@@ -39,6 +39,6 @@ install: clean all
 	@mkdir -p -- ${DESTDIR}${PREFIX}/
 	cp -f -- $(TARGET) ${DESTDIR}${PREFIX}/
 	@chmod 755 -- ${DESTDIR}${PREFIX}/$(TARGET)
-	@mkdir -p -- ${DESTDIR}${MANPREFIX}/
+	@mkdir -p -- ${DESTDIR}${MANPREFIX}/man1
 	cp -- ${TARGET}.1 ${DESTDIR}${MANPREFIX}/man1/${TARGET}.1
 	@chmod 644 ${DESTDIR}${MANPREFIX}/man1/${TARGET}.1
