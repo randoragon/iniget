@@ -1,0 +1,162 @@
+.TH INIGET 1 "2021-04-14" "iniget.2c327c5" ""
+.SH NAME
+iniget - extract information from INI files
+.SH SYNOPSIS
+.B iniget
+.RI [ OPTION ]
+.RI [ FILE ]
+.RI [ QUERY ...]
+.SH DESCRIPTION
+.B iniget
+intakes a path to a file (or - for stdin) and evaluates
+any number of queries on that file (query syntax is
+explained in detail later). The result of each query is
+printed on a separate line.
+.P
+.B iniget
+is not an INI files validation tool, it (for the most part) assumes
+that the file it reads is formatted correctly. It does so to minimize
+the amount of processing required (for example, once it reaches the
+closing bracket of a section, it doesn't care about the remainder
+of the line).
+.SH OPTIONS
+.TP
+.RB \-h , " \-\-help"
+Prints this help message.
+.SH EXIT STATUS
+.P
+By convention, positive error codes indicate that the user
+is guilty, and negative that either the program malfunctioned
+or some other third-party caused an error (e.g. insufficient memory).
+.IP 0
+success
+.IP 1
+failed to open file
+.IP 2
+invalid query (see
+.B QUERY SYNTAX
+)
+.IP 3
+value not found; this means that some query contains a section/key
+pair that is nowhere to be found within the file, even if the
+query is syntactically correct and the file successfully opened
+.IP -1
+internal error; this should be reported (see
+.B BUGS
+)
+.IP -2
+memory error; failed to allocate enough memory for the process
+.SH QUERY SYNTAX
+.IP \(bu 2
+Each query is a mathematical expression in infix notation
+.IP \(bu 2
+operands must be of form \fI{section.key}\fP (section is optional)
+.IP \(bu 2
+operators are one of:
+.IP "" 6
+\fB+\fP	addition
+.IP "" 6
+\fB-\fP	subtraction
+.IP "" 6
+\fB*\fP	multiplication
+.IP "" 6
+\fB/\fP	division
+.IP "" 6
+\fB%\fP	modulus
+.IP "" 6
+\fB^\fP	exponentiation
+.IP \(bu 2
+round parentheses may be used to enforce order of operation
+.IP \(bu 2
+operator precedence and associativity should work intuitively (like in math)
+.IP \(bu 2
+the \fB*\fP operator is implicit and may be omitted (like in math)
+.IP \(bu 2
+all operators work on numbers and some work on strings
+.IP \(bu 2
+for strings, \fB+\fP is concatenation, and \fB*\fP is repetition (must be multiplied by a non-negative number, only the integer part matters)
+.SH FILE FORMAT
+.IP \(bu 2
+section names and key/value pairs must be on separate lines
+.IP \(bu 2
+section and key names may consist of alphanumeric characters, hyphens and underscores
+.IP \(bu 2
+key and value must be delimited by \fB=\fP (may be surrounded by whitespace)
+.IP \(bu 2
+leading/trailing whitespace characters are ignored
+.IP \(bu 2
+semicolon starts a comment until the end of the line
+.IP \(bu 2
+values consisting of digits (with optional decimal part) are interpreted as numbers
+.IP \(bu 2
+any value that fails to be recognized as a number is considered a string
+.IP \(bu 2
+you can force a value to be a string by enclosing it in double quotes
+.IP \(bu 2
+double quotes may also be used to have a string with leading/trailing whitespace
+.SH BUGS
+.P
+.B iniget
+uses double for all number calculations, so it's only viable
+for relatively simple calculations. With huge or tiny numbers,
+you will get output like
+.BR inf .
+.P
+Internally, each query has its own copies of all data that it needs
+to compute the result. While individual queries were optimized not to
+store multiple copies of the same value, separate queries using the
+same value store independent copies. Because of that, if you pass
+many queries, each needing a very long string value from the file,
+the memory footprint of the program could get very large.
+.P
+Bugs can either be reported directly to the author, or by opening
+an issue on the official GitHub repository:
+.sp
+.IP \(bu 2
+.MT randoragongamedev@gmail.com
+Randoragon
+.ME
+.sp -1
+.IP \(bu 2
+.IR https://github.com/randoragon/iniget .
+.SH EXAMPLE
+Consider the following input file:
+.TS -C
+box;
+cb
+l.
+file.ini
+_
+.nf
+globalvar = 5
+
+; this is a comment
+[nums]
+a = 2.5
+b = .99
+
+[str]
+ed = ed is the standard text editor
+.fi
+.TE
+.sp
+.P
+Now, here are some commands and their outputs:
+.sp
+.EX
+.B $ iniget file.ini '{globalvar} + {nums.a}'
+7.5
+
+.B $ iniget file.ini '{globalvar}{nums.b}'
+4.95
+
+.B $ iniget file.ini '{str.ed} + {str.ed}' '{str.ed} * {nums.a}'
+ed is the standard editored is the standard editor
+ed is the standard editored is the standard editor
+
+.B $ cat file.ini | iniget - '{nums.a} % {nums.b}'
+0.52
+.EE
+.SH AUTHORS
+.B iniget
+was written by Randoragon. See included LICENSE file for terms of use.
