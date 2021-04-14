@@ -6,22 +6,32 @@
 #include <string.h>
 #include <stdbool.h>
 
+/* Return codes of the entire program */
+enum {
+    RET_SUCCESS = 0,
+    RET_FILE_ERROR = 1,
+    RET_INVALID_QUERY = 2,
+    RET_VALUE_NOT_FOUND = 3,
+    RET_INTERNAL_ERROR = -1,
+    RET_MEMORY_ERROR = -2
+};
+
 void help(void);
 
 int main(int argc, char **argv)
 {
     Query **queries;
-    int i, ret;
+    int i, err;
     FILE *input;
 
     /* Parse command-line options */
     if (argc < 2) {
         info("try 'iniget --help' for more information.");
-        return 0;
+        return RET_SUCCESS;
     }
     if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
         help();
-        return 0;
+        return RET_SUCCESS;
     }
 
     /* Determine input stream */
@@ -30,38 +40,69 @@ int main(int argc, char **argv)
     } else {
         if (!(input = fopen(argv[1], "r"))) {
             info("failed to open file");
-            return 1;
+            return RET_FILE_ERROR;
         }
     }
     if (argc < 3) {
         /* No queries to run */
         fclose(input);
-        return 0;
+        return RET_SUCCESS;
     }
 
     /* Allocate space for queries */
     if (!(queries = malloc((argc - 2) * sizeof *queries))) {
         info("memory error");
-        return EXIT_FAILURE;
+        return RET_MEMORY_ERROR;
     }
 
     /* Parse queries */
     for (i = 2; i < argc; i++) {
         Query *q;
+        int err;
 
-        if (parseQueryString(&q, argv[i])) {
+        if ((err = parseQueryString(&q, argv[i]))) {
             while (i-- > 2) {
                 queryFree(queries[i-2]);
             }
             free(queries);
-            return EXIT_FAILURE;
+            switch (err) {
+                case 1:
+                    return RET_MEMORY_ERROR;
+                case 2:
+                    return RET_INTERNAL_ERROR;
+                case 3:
+                    return  RET_INVALID_QUERY;
+                default:
+                    STAMP();
+                    error("unmatched return code");
+                    return RET_INTERNAL_ERROR;
+            }
         }
 
         queries[i-2] = q;
     }
 
     /* Run queries */
-    ret = runQueries(input, (const Query**)queries, argc - 2);
+    if ((err = runQueries(input, (const Query**)queries, argc - 2))) {
+        switch (err) {
+            case 1:
+                err = RET_MEMORY_ERROR;
+                break;
+            case 2:
+                err = RET_INTERNAL_ERROR;
+                break;
+            case 3:
+                err = RET_INVALID_QUERY;
+                break;
+            case 4:
+                err = RET_VALUE_NOT_FOUND;
+                break;
+            default:
+                STAMP();
+                error("unmatched return code");
+                err = RET_INTERNAL_ERROR;
+        }
+    }
 
     /* Cleanup */
     fclose(input);
@@ -70,7 +111,7 @@ int main(int argc, char **argv)
     }
     free(queries);
 
-    return ret;
+    return err;
 }
 
 void help(void)
