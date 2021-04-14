@@ -4,6 +4,9 @@ LD = cc
 CFLAGS = -std=c89 -pedantic -Wall -Wextra
 LDFLAGS = -lm
 
+# iniget version
+VERSION = 1.0
+
 
 # Directories and files configuration
 SRCDIR = src
@@ -40,5 +43,5 @@ install: clean all
 	cp -f -- $(TARGET) $(DESTDIR)$(PREFIX)/bin
 	@chmod 755 -- $(DESTDIR)$(PREFIX)/bin/$(TARGET)
 	@mkdir -p -- $(DESTDIR)$(MANPREFIX)/man1
-	cp -- iniget.1 $(DESTDIR)$(MANPREFIX)/man1/iniget.1
+	sed "s/VERSION/$(VERSION)/g" < iniget.1 > $(DESTDIR)$(MANPREFIX)/man1/iniget.1
 	@chmod 644 $(DESTDIR)$(MANPREFIX)/man1/iniget.1
